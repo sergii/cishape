@@ -33,7 +33,12 @@ fn checked_in_economics_policy_selects_depot_under_30_second_sla() {
     assert_eq!(selected.provider, "depot");
     assert_eq!(selected.offer_id, "depot-ubuntu-24.04");
     assert_eq!(selection.eligible_candidates, 2);
-    assert!(selection.excluded.iter().any(|item| item.provider == "hetzner"));
+    assert!(
+        selection
+            .excluded
+            .iter()
+            .any(|item| item.provider == "hetzner")
+    );
 }
 
 #[test]
@@ -52,7 +57,10 @@ fn queue_change_can_flip_selection_to_persistent_capacity() {
         .expect("economics policy");
     let selection = select(&report(&snapshot), &policy).expect("selection");
 
-    assert_eq!(selection.selected.expect("selected offer").provider, "hetzner");
+    assert_eq!(
+        selection.selected.expect("selected offer").provider,
+        "hetzner"
+    );
 }
 
 #[test]
@@ -68,7 +76,10 @@ fn utilization_change_can_flip_cost_selection() {
     };
 
     let selection = select(&report(&snapshot), &policy).expect("selection");
-    assert_eq!(selection.selected.expect("selected offer").provider, "hetzner");
+    assert_eq!(
+        selection.selected.expect("selected offer").provider,
+        "hetzner"
+    );
 
     let mut low_utilization = snapshot;
     low_utilization
@@ -79,5 +90,8 @@ fn utilization_change_can_flip_cost_selection() {
         .utilization = Some(0.01);
 
     let selection = select(&report(&low_utilization), &policy).expect("selection");
-    assert_eq!(selection.selected.expect("selected offer").provider, "depot");
+    assert_eq!(
+        selection.selected.expect("selected offer").provider,
+        "depot"
+    );
 }
