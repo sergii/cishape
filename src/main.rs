@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use cishape::decision::{
-    JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_jev_response,
+    JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
+    record_jev_response,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -79,6 +80,16 @@ enum Command {
         repository: Option<String>,
         #[arg(long, value_enum, default_value = "text")]
         format: ReportFormat,
+    },
+    /// Produce and persist a deterministic DecisionRecord from historical evidence.
+    Decide {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        job: String,
     },
     /// Prepare an offline Jev shadow decision request from historical evidence.
     DecisionPrepare {
@@ -163,6 +174,12 @@ fn main() -> Result<()> {
             repository,
             format,
         } => report_command(&db, repository.as_deref(), format),
+        Command::Decide {
+            db,
+            repository,
+            output,
+            job,
+        } => decide_command(&db, repository.as_deref(), &job, output.as_deref()),
         Command::DecisionPrepare {
             db,
             repository,
@@ -363,6 +380,23 @@ fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> 
     Ok(())
 }
 
+fn decide_command(
+    db: &Path,
+    repository: Option<&str>,
+    job: &str,
+    output: Option<&Path>,
+) -> Result<()> {
+    let store = Store::open(db)?;
+    let profile = store.profile_for(job, repository)?;
+    let catalog = default_catalog();
+    let recommendation = recommend(&profile, &catalog)
+        .with_context(|| format!("no deterministic recommendation for {job}"))?;
+    let feasible = feasible_candidates(&profile, &catalog);
+    let record = record_deterministic_decision(&profile, &recommendation, &feasible)?;
+
+    persist_decision_record(db, &record, output)
+}
+
 fn decision_prepare_command(
     db: &Path,
     repository: Option<&str>,
@@ -483,12 +517,14 @@ fn persist_decision_record(
     )
     .with_context(|| format!("write {}", output_path.display()))?;
 
-    println!("recorded Jev shadow decision");
+    println!("recorded decision");
+    println!("  provider          {}", record.provider.as_str());
+    println!("  mode              {}", record.mode.as_str());
     println!("  workload          {}", record.job);
     println!("  baseline          {}", record.deterministic_baseline);
     println!("  selected          {}", record.selected_candidate);
     println!("  confidence        {:.3}", record.confidence);
-    println!("  model             {}", record.model);
+    println!("  engine            {}", record.model);
     println!("  agrees baseline   {}", record.agrees_with_baseline);
     println!("  stored            {}", inserted);
     println!("  evidence          {}", output_path.display());
