@@ -150,4 +150,3 @@ fn report_summarizes_repository_workloads_as_markdown() {
     assert!(report.contains("| Repository | Job | Runs |"));
     assert!(report.contains("| sergii/cishape | test | 2 |"));
 }
-
