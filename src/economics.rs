@@ -437,6 +437,7 @@ mod tests {
             os: "linux".into(),
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
+            repository_visibility: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: None,

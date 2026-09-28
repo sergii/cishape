@@ -27,6 +27,7 @@ Every offer records:
 - provider
 - provider offer ID
 - optional CI runner label
+- optional repository visibility context when the same runner label maps to different capacity/commercial semantics
 - CPU and memory when verified
 - OS and architecture
 - execution model
@@ -53,6 +54,18 @@ cishape catalog-fit \
   --duration-ms 11000
 ```
 
+When an offer is repository-context specific, pass that context explicitly:
+
+```bash
+cishape catalog-fit \
+  --cpu 4 \
+  --memory-gib 8 \
+  --duration-ms 11000 \
+  --repository-visibility public
+```
+
+Context-specific offers are excluded when visibility is omitted. CIShape does not infer commercial/capacity context from a runner label alone.
+
 CATALOG1 ranks only offers that are safe to compare:
 
 ```text
@@ -73,6 +86,24 @@ CIShape does not invent missing facts.
 An offer with unknown memory, billing increment, or price remains visible in the catalog but is not selected by `catalog-fit`.
 
 This is intentional. Provider coverage and optimization safety are separate concerns.
+
+## Context-specific runner labels
+
+A CI runner label is an adapter alias, not a globally unique machine shape.
+
+GitHub currently documents `ubuntu-latest` differently by repository visibility:
+
+- public repository standard Ubuntu: 4 CPU / 16 GB and no standard-runner usage charge
+- private repository standard Ubuntu: 2 CPU / 8 GB, using included minutes and then the published Linux minute rate
+
+CIShape therefore stores these as different offer IDs even though both use the `ubuntu-latest` workflow label:
+
+```text
+github-actions/ubuntu-latest-public-x64
+github-actions/ubuntu-latest-private-x64
+```
+
+A live capacity plan must choose the offer ID that matches its repository context. The label is used to observe jobs; the offer ID identifies the economics/capacity contract.
 
 ## Pricing models
 
@@ -109,9 +140,9 @@ CAPACITY1 adds a separate economics evaluator. It may compare fixed servers with
 
 ## Initial source snapshot
 
-The 2026-09-28 snapshot contains:
+The 2026-09-29 snapshot contains:
 
-- GitHub Actions managed Linux x64 offers
+- GitHub Actions managed Linux x64 offers, including distinct public/private standard Ubuntu contexts
 - Depot managed Linux x64 offers
 - Blacksmith partial public pricing data
 - Namespace as a configurable managed provider with intentionally incomplete public price/shape data

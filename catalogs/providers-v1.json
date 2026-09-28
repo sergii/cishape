@@ -1,7 +1,29 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-09-28",
+  "observed_at": "2026-09-29",
   "offers": [
+    {
+      "provider": "github-actions",
+      "offer_id": "ubuntu-latest-public-x64",
+      "runner_label": "ubuntu-latest",
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_bytes": 17179869184
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "repository_visibility": "public",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0,
+        "billing_increment_seconds": 60,
+        "context": "Standard GitHub-hosted runners are free in public repositories. GitHub rounds hosted-runner usage to whole minutes; the zero rate means rounding does not create runner usage cost."
+      },
+      "source_url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "observed_at": "2026-09-29",
+      "notes": "Context-specific standard GitHub-hosted Ubuntu offer for public repositories; GitHub documents 4 CPU / 16 GB for ubuntu-latest in public repositories."
+    },
     {
       "provider": "github-actions",
       "offer_id": "ubuntu-latest-private-x64",
@@ -17,11 +39,12 @@
         "kind": "per_minute",
         "usd_per_minute": 0.006,
         "billing_increment_seconds": 60,
-        "context": "Baseline paid Linux x64 rate for private repositories after included minutes; public standard runners may be free."
+        "context": "Baseline paid Linux x64 rate for private repositories after included minutes; private standard Ubuntu runners are 2 CPU / 8 GB."
       },
-      "source_url": "https://docs.github.com/en/billing/reference/actions-runner-pricing",
-      "observed_at": "2026-09-28",
-      "notes": "GitHub documents 2 CPU / 8 GB for standard private-repository Ubuntu runners."
+      "source_url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "observed_at": "2026-09-29",
+      "notes": "Context-specific standard GitHub-hosted Ubuntu offer for private repositories.",
+      "repository_visibility": "private"
     },
     {
       "provider": "github-actions",
@@ -41,7 +64,7 @@
         "context": "GitHub-hosted larger Linux x64 runner; larger runners are billed even when public."
       },
       "source_url": "https://docs.github.com/en/billing/reference/actions-runner-pricing",
-      "observed_at": "2026-09-28"
+      "observed_at": "2026-09-29"
     },
     {
       "provider": "depot",
