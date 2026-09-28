@@ -90,6 +90,8 @@ JEV1:
 
 JEV2 adds the explicit live TypeSafe HTTP transport while preserving raw response evidence and the same fail-closed validator.
 
+LIVE1 adds a manual GitHub Actions proof that consumes rolling history. The only remaining gate for the first real provider decision is configuring `JEV_API_KEY` and dispatching that workflow.
+
 Follow-ups add richer queue, price, latency-objective, provider-reliability context, and outcome evaluation after sufficient history exists.
 
 ## VS5 - Cloud ingest

@@ -1,0 +1,166 @@
+name: Jev Shadow Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: CIShape repository scope from rolling history
+        required: true
+        default: sergii/cishape
+        type: string
+      job:
+        description: Logical CIShape workload to evaluate
+        required: true
+        default: test
+        type: string
+      model:
+        description: Jev model alias or pinned model
+        required: true
+        default: jev-latest
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cishape-jev-shadow-proof
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  shadow:
+    name: shadow
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Verify Jev credential
+        env:
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${JEV_API_KEY}" ]; then
+            echo "Repository secret JEV_API_KEY is required for this manual proof." >&2
+            exit 1
+          fi
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+          gh --version
+          jq --version
+
+      - name: Resolve dependency graph
+        run: cargo generate-lockfile
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: cishape-ci
+          key: duckdb-1.10505.0
+
+      - name: Build CIShape
+        run: cargo build --locked --bin cishape
+
+      - name: Download latest rolling history
+        id: history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cishape/history
+
+          artifact_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100"               --jq '[.artifacts[]
+                | select(.expired == false)
+                | select(.name | startswith("cishape-history-"))]
+                | sort_by(.created_at)
+                | reverse
+                | .[0].id // empty'
+          )"
+
+          if [ -z "${artifact_id}" ]; then
+            echo "No non-expired cishape-history-* artifact is available." >&2
+            exit 1
+          fi
+
+          gh api             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip"             > .cishape/history/history.zip
+
+          unzip -q .cishape/history/history.zip -d .cishape/history/unpacked
+          rm .cishape/history/history.zip
+
+          db_path="$(find .cishape/history/unpacked -type f -name cishape.duckdb -print -quit)"
+          if [ -z "${db_path}" ]; then
+            echo "Rolling history artifact does not contain cishape.duckdb." >&2
+            exit 1
+          fi
+
+          echo "artifact_id=${artifact_id}" >> "${GITHUB_OUTPUT}"
+          echo "db_path=${db_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare bounded Jev request
+        run: |
+          set -euo pipefail
+          mkdir -p .cishape/decisions
+          target/debug/cishape decision-prepare             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ inputs.repository }}"             --model "${{ inputs.model }}"             --output .cishape/decisions/request.json             "${{ inputs.job }}"
+
+      - name: Run Jev shadow decision
+        env:
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
+        run: |
+          set -euo pipefail
+          target/debug/cishape decision-run             --db "${{ steps.history.outputs.db_path }}"             --request .cishape/decisions/request.json             --response-output .cishape/decisions/response.json             --output .cishape/decisions/decision.json
+
+      - name: Summarize shadow decision
+        run: |
+          set -euo pipefail
+          baseline="$(jq -r '.deterministic_baseline' .cishape/decisions/decision.json)"
+          selected="$(jq -r '.selected_candidate' .cishape/decisions/decision.json)"
+          confidence="$(jq -r '.confidence' .cishape/decisions/decision.json)"
+          model="$(jq -r '.model' .cishape/decisions/decision.json)"
+          agrees="$(jq -r '.agrees_with_baseline' .cishape/decisions/decision.json)"
+          evidence_runs="$(jq -r '.evidence_runs' .cishape/decisions/decision.json)"
+
+          {
+            echo "## CIShape Jev shadow proof"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Repository | \`${{ inputs.repository }}\` |"
+            echo "| Job | \`${{ inputs.job }}\` |"
+            echo "| Evidence runs | ${evidence_runs} |"
+            echo "| Deterministic baseline | \`${baseline}\` |"
+            echo "| Jev selected | \`${selected}\` |"
+            echo "| Confidence | ${confidence} |"
+            echo "| Model | \`${model}\` |"
+            echo "| Agrees with baseline | ${agrees} |"
+            echo "| History artifact | ${{ steps.history.outputs.artifact_id }} |"
+            echo
+            echo "Shadow only. No runner routing or workflow mutation was performed."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload decision evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cishape-jev-shadow-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .cishape/decisions/request.json
+            .cishape/decisions/response.json
+            .cishape/decisions/decision.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 30

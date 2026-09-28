@@ -107,6 +107,8 @@ cargo run -- decision-run \
 
 The live adapter uses the official TypeSafe System One endpoint by default, stores the raw response as evidence, and then runs the same fail-closed JEV1 validation. Shadow decisions have no CI execution side effects.
 
+For a reproducible first live proof, the repository also contains a manual-only `Jev Shadow Proof` GitHub Actions workflow. It consumes the latest rolling CIShape history artifact and requires only a repository secret named `JEV_API_KEY`.
+
 ## Direction
 
 The next slices can add OpenTelemetry/Parquet interchange and richer provider/queue/cost context after shadow decisions have enough historical evidence.

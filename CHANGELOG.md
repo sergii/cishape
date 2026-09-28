@@ -18,6 +18,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add an offline Jev shadow-decision contract over deterministic feasible runner candidates.
 - Add an opt-in live TypeSafe Jev transport that preserves the same fail-closed shadow boundary.
 - Add explicit live TypeSafe Jev transport with Rust TLS and preserved provider response evidence.
+- Add a manual GitHub Actions Jev shadow proof over rolling CIShape history.
 
 ### Documentation
 
