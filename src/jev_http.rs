@@ -93,6 +93,7 @@ mod tests {
             let mut data = Vec::new();
             let mut buffer = [0_u8; 4096];
             let mut expected_len = None;
+            let mut chunked = false;
 
             loop {
                 match stream.read(&mut buffer) {
@@ -106,19 +107,26 @@ mod tests {
                         {
                             let header_text =
                                 String::from_utf8_lossy(&data[..header_end]).into_owned();
-                            let content_length = header_text
-                                .lines()
-                                .find_map(|line| {
-                                    let (name, value) = line.split_once(':')?;
-                                    name.eq_ignore_ascii_case("content-length")
-                                        .then(|| value.trim().parse::<usize>().ok())
-                                        .flatten()
-                                })
-                                .unwrap_or(0);
-                            expected_len = Some(header_end + 4 + content_length);
+                            let content_length = header_text.lines().find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().ok())
+                                    .flatten()
+                            });
+                            chunked = header_text.lines().any(|line| {
+                                let Some((name, value)) = line.split_once(':') else {
+                                    return false;
+                                };
+                                name.eq_ignore_ascii_case("transfer-encoding")
+                                    && value.trim().eq_ignore_ascii_case("chunked")
+                            });
+                            expected_len =
+                                content_length.map(|length| header_end + 4 + length);
                         }
 
-                        if expected_len.is_some_and(|length| data.len() >= length) {
+                        if expected_len.is_some_and(|length| data.len() >= length)
+                            || (chunked && data.windows(5).any(|window| window == b"0\r\n\r\n"))
+                        {
                             break;
                         }
                     }
