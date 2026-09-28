@@ -50,11 +50,24 @@ jobs:
           key: duckdb-1.10505.0
           cache-on-failure: true
 
+      - name: Build CIShape observer
+        run: cargo build --locked --bin cishape
+
       - name: Test
-        run: cargo test --locked --all-features
+        run: ./target/debug/cishape observe --job ci-test -- cargo test --locked --all-features
 
       - name: Clippy
-        run: cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
+        run: ./target/debug/cishape observe --job ci-clippy -- cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
 
       - name: POC0 demo
-        run: cargo run --locked --quiet -- demo
+        run: ./target/debug/cishape observe --job ci-demo -- ./target/debug/cishape demo
+
+      - name: Upload CIShape observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cishape-observations
+          path: .cishape/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
