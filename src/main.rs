@@ -94,9 +94,7 @@ fn main() -> Result<()> {
             command,
         } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Import { db, files } => import_command(&db, &files),
-        Command::Export { db, format, output } => {
-            export_command(&db, format, output.as_deref())
-        }
+        Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
         Command::Profile { db, job } => {
             let store = Store::open(&db)?;
             print_profile(&store.profile(&job)?);
@@ -181,7 +179,6 @@ fn observe_command(job: &str, db: &Path, output: Option<&Path>, command: &[Strin
 
     Ok(())
 }
-
 
 fn import_command(db: &Path, files: &[PathBuf]) -> Result<()> {
     ensure_parent(db)?;
