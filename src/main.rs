@@ -520,6 +520,8 @@ fn advisory_command(
 
     let report = AdvisoryReport {
         schema_version: ADVISORY_SCHEMA_VERSION,
+        policy_id: policy.policy_id.clone(),
+        policy_schema_version: policy.schema_version,
         min_runs: policy.min_runs,
         items,
     };
