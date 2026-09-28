@@ -168,7 +168,6 @@ pub fn select(report: &EconomicsReport, policy: &EconomicsPolicy) -> Result<Econ
     })
 }
 
-
 pub fn select_batch(
     report: &BatchEconomicsReport,
     policy: &EconomicsPolicy,
@@ -267,7 +266,6 @@ fn compare(
             .then_with(|| left.offer_id.cmp(&right.offer_id)),
     }
 }
-
 
 fn batch_exclusion_reasons(
     evaluation: &BatchEconomicsEvaluation,
