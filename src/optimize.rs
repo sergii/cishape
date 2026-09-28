@@ -150,7 +150,11 @@ mod tests {
 
         assert_eq!(candidates[0].name, "cpu2-mem4");
         assert_eq!(candidates[1].name, "cpu4-mem8");
-        assert!(candidates.iter().all(|candidate| candidate.cpu_headroom >= 1.5));
+        assert!(
+            candidates
+                .iter()
+                .all(|candidate| candidate.cpu_headroom >= 1.5)
+        );
         assert!(
             candidates
                 .iter()
