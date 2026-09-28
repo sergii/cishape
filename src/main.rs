@@ -65,18 +65,24 @@ enum Command {
     Profile {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
     /// Recommend the cheapest runner shape that satisfies v0 safety constraints.
     Recommend {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
 }
@@ -95,21 +101,33 @@ fn main() -> Result<()> {
         } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Import { db, files } => import_command(&db, &files),
         Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
-        Command::Profile { db, job } => {
+        Command::Profile {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            print_profile(&store.profile(&job)?);
+            print_profile(&store.profile_for(&job, repository.as_deref())?);
             Ok(())
         }
-        Command::Recommend { db, job } => {
+        Command::Recommend {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            let profile = store.profile(&job)?;
+            let profile = store.profile_for(&job, repository.as_deref())?;
             let recommendation = recommendation_for(&profile)?;
             print_recommendation(&recommendation);
             Ok(())
         }
-        Command::Explain { db, job } => {
+        Command::Explain {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            let profile = store.profile(&job)?;
+            let profile = store.profile_for(&job, repository.as_deref())?;
             let recommendation = recommendation_for(&profile)?;
             print_explanation(&profile, &recommendation);
             Ok(())
@@ -280,6 +298,9 @@ fn print_observation(observation: &RunObservation, output: &Path) {
 
 fn print_profile(profile: &JobShape) {
     println!("JobShape {}", profile.job);
+    if let Some(repository) = &profile.repository {
+        println!("  repository        {repository}");
+    }
     println!("  runs              {}", profile.runs);
     println!("  current runner    {}", profile.current_runner);
     println!(
