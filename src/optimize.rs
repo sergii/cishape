@@ -7,27 +7,27 @@ const LATENCY_PENALTY: f64 = 1.05;
 pub fn default_catalog() -> Vec<RunnerCandidate> {
     vec![
         RunnerCandidate {
-            name: "c1-m2".into(),
+            name: "cpu1-mem2".into(),
             shape: RunnerShape::new(1_000, 2 * GIB),
             usd_per_minute: 0.001,
         },
         RunnerCandidate {
-            name: "c2-m4".into(),
+            name: "cpu2-mem4".into(),
             shape: RunnerShape::new(2_000, 4 * GIB),
             usd_per_minute: 0.002,
         },
         RunnerCandidate {
-            name: "c4-m8".into(),
+            name: "cpu4-mem8".into(),
             shape: RunnerShape::new(4_000, 8 * GIB),
             usd_per_minute: 0.004,
         },
         RunnerCandidate {
-            name: "c8-m16".into(),
+            name: "cpu8-mem16".into(),
             shape: RunnerShape::new(8_000, 16 * GIB),
             usd_per_minute: 0.008,
         },
         RunnerCandidate {
-            name: "c16-m64".into(),
+            name: "cpu16-mem64".into(),
             shape: RunnerShape::new(16_000, 64 * GIB),
             usd_per_minute: 0.016,
         },
@@ -86,7 +86,7 @@ mod tests {
     use crate::model::{JobShape, MIB};
 
     #[test]
-    fn recommends_c2_m4_for_light_job() {
+    fn recommends_cpu2_mem4_for_light_job() {
         let profile = JobShape {
             job: "lint".into(),
             runs: 100,
