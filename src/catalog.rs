@@ -29,13 +29,19 @@ impl ProviderCatalog {
             "unsupported provider catalog schema version {}",
             self.schema_version
         );
-        anyhow::ensure!(!self.observed_at.trim().is_empty(), "catalog observed_at is required");
+        anyhow::ensure!(
+            !self.observed_at.trim().is_empty(),
+            "catalog observed_at is required"
+        );
 
         let mut identities = std::collections::BTreeSet::new();
         for offer in &self.offers {
             offer.validate()?;
             let identity = format!("{}:{}", offer.provider, offer.offer_id);
-            anyhow::ensure!(identities.insert(identity.clone()), "duplicate offer {identity}");
+            anyhow::ensure!(
+                identities.insert(identity.clone()),
+                "duplicate offer {identity}"
+            );
         }
 
         Ok(())
@@ -167,9 +173,15 @@ impl RunnerOffer {
         anyhow::ensure!(!self.provider.trim().is_empty(), "provider is required");
         anyhow::ensure!(!self.offer_id.trim().is_empty(), "offer_id is required");
         anyhow::ensure!(!self.os.trim().is_empty(), "os is required");
-        anyhow::ensure!(!self.architecture.trim().is_empty(), "architecture is required");
+        anyhow::ensure!(
+            !self.architecture.trim().is_empty(),
+            "architecture is required"
+        );
         anyhow::ensure!(!self.source_url.trim().is_empty(), "source_url is required");
-        anyhow::ensure!(!self.observed_at.trim().is_empty(), "offer observed_at is required");
+        anyhow::ensure!(
+            !self.observed_at.trim().is_empty(),
+            "offer observed_at is required"
+        );
 
         if let Some(cpu_millis) = self.capacity.cpu_millis {
             anyhow::ensure!(cpu_millis > 0, "offer CPU capacity must be positive");
@@ -184,7 +196,10 @@ impl RunnerOffer {
                 billing_increment_seconds,
                 ..
             } => {
-                anyhow::ensure!(*usd_per_minute >= 0.0, "per-minute price cannot be negative");
+                anyhow::ensure!(
+                    *usd_per_minute >= 0.0,
+                    "per-minute price cannot be negative"
+                );
                 if let Some(seconds) = billing_increment_seconds {
                     anyhow::ensure!(*seconds > 0, "billing increment must be positive");
                 }
