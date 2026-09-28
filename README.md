@@ -163,6 +163,17 @@ cargo run -- economics \
 
 The evaluator models queue depth, busy/parallel slots, slot turnover, warm/cold cache state, billing granularity, and fixed-server utilization. It emits effective cost and time-to-green as separate dimensions and marks Pareto-optimal options without hiding an arbitrary weighted score. CAPACITY2 applies a versioned economics policy such as "minimize effective cost while time-to-green stays under 30 seconds" and records the deterministic provider/offer selection. CAPACITY3 adds `--jobs N` so the same model can price and schedule a batch of parallel CI jobs.
 
+CAPACITY4 extends the same evidence model to heterogeneous workflow DAGs:
+
+```bash
+cargo run -- workflow-economics \
+  --workflow examples/workflow-demand-v1.json \
+  --snapshot examples/workflow-capacity-snapshot-v1.json \
+  --policy policies/economics-default-v1.json
+```
+
+Each workflow job can have its own canonical RunnerShape, predicted runtime, and dependency list. CIShape validates the DAG, schedules fan-out/fan-in work against explicit provider slots and queue-ahead state, and applies EconomicsPolicy to total workflow cost and time-to-green. It remains advisory-only and does not place individual jobs across providers.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
@@ -178,7 +189,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. Capacity economics and its selection policy are deterministic and local-first. The next slices can ingest real runtime capacity snapshots and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics, batch scheduling, and workflow DAG economics are deterministic and local-first. The next slices can ingest real runtime capacity snapshots and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -196,6 +207,7 @@ See:
 - [Capacity economics](docs/capacity-economics.md)
 - [Economics policy](docs/economics-policy.md)
 - [Parallel-job batch economics](docs/batch-economics.md)
+- [Workflow DAG economics](docs/workflow-economics.md)
 - [Optimization policy](docs/optimization-policy.md)
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)

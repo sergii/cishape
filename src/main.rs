@@ -8,8 +8,10 @@ use cishape::decision::{
 };
 use cishape::economics::{CapacitySnapshot, evaluate as evaluate_economics};
 use cishape::economics_policy::{
-    EconomicsDecisionReport, EconomicsPolicy, select as select_economics,
-    select_batch as select_batch_economics, to_markdown as economics_decision_to_markdown,
+    EconomicsDecisionReport, EconomicsPolicy, WorkflowEconomicsDecisionReport,
+    select as select_economics, select_batch as select_batch_economics,
+    select_workflow as select_workflow_economics, to_markdown as economics_decision_to_markdown,
+    workflow_decision_to_markdown,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -22,6 +24,7 @@ use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_m
 use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
+use cishape::workflow::{WorkflowDemand, evaluate as evaluate_workflow_economics};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
 
@@ -134,6 +137,21 @@ enum Command {
         duration_ms: u64,
         #[arg(long, default_value_t = 1)]
         jobs: u32,
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: EconomicsFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Evaluate a heterogeneous workflow DAG against provider capacity.
+    WorkflowEconomics {
+        #[arg(long, default_value = "catalogs/providers-v1.json")]
+        catalog: PathBuf,
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        workflow: PathBuf,
+        #[arg(long, default_value = "policies/economics-default-v1.json")]
+        policy: PathBuf,
         #[arg(long, value_enum, default_value = "markdown")]
         format: EconomicsFormat,
         #[arg(long)]
@@ -293,6 +311,21 @@ fn main() -> Result<()> {
             &policy,
             (cpu, memory_gib, jobs),
             duration_ms,
+            format,
+            output.as_deref(),
+        ),
+        Command::WorkflowEconomics {
+            catalog,
+            snapshot,
+            workflow,
+            policy,
+            format,
+            output,
+        } => workflow_economics_command(
+            &catalog,
+            &snapshot,
+            &workflow,
+            &policy,
             format,
             output.as_deref(),
         ),
@@ -607,6 +640,46 @@ fn economics_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote capacity economics report to {}", path.display());
+    } else {
+        print!("{payload}");
+        if !payload.ends_with('\n') {
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+fn workflow_economics_command(
+    catalog_path: &Path,
+    snapshot_path: &Path,
+    workflow_path: &Path,
+    policy_path: &Path,
+    format: EconomicsFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    let catalog = ProviderCatalog::load(catalog_path)?;
+    let snapshot = CapacitySnapshot::load(snapshot_path)?;
+    let workflow = WorkflowDemand::load(workflow_path)?;
+    let policy = EconomicsPolicy::load(policy_path)?;
+    let workflow = evaluate_workflow_economics(&catalog, &snapshot, &workflow)?;
+    let selection = select_workflow_economics(&workflow, &policy)?;
+    let report = WorkflowEconomicsDecisionReport {
+        workflow,
+        selection,
+    };
+
+    let payload = match format {
+        EconomicsFormat::Json => serde_json::to_string_pretty(&report)
+            .context("serialize workflow economics decision report")?,
+        EconomicsFormat::Markdown => workflow_decision_to_markdown(&report),
+    };
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote workflow economics report to {}", path.display());
     } else {
         print!("{payload}");
         if !payload.ends_with('\n') {

@@ -35,6 +35,8 @@ CIShape is not a CI control plane and must not become one by accident.
 - Keep effective cost and time-to-green as separate dimensions unless a versioned policy explicitly combines or constrains them.
 - Economics selection policy must be versioned data with explicit hard constraints and deterministic tie-breaking; do not hide provider preference in code.
 - Parallel-job time-to-green must be derived from explicit slot availability, queue-ahead work, and workload runtime. Do not approximate concurrency with an unexplained multiplier.
+- Workflow DAG scheduling must respect both dependency completion and explicit slot availability, with deterministic tie-breaking and no hidden provider preference.
+- Workflow-level economics evaluates one provider offer as a whole-workflow scenario unless a future versioned placement model explicitly says otherwise; do not silently turn advisory evaluation into cross-provider routing.
 - Outcome evaluation is observational. Never claim a runner caused a failure or latency change from temporal correlation alone.
 - OpenTelemetry CI/CD semantics should be reused where they fit instead of inventing equivalent vocabulary.
 - The local-first path must remain useful without signup or a network service.

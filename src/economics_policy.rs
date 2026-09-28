@@ -4,6 +4,9 @@ use crate::batch::{
 use crate::economics::{
     EconomicsEvaluation, EconomicsReport, to_markdown as economics_to_markdown,
 };
+use crate::workflow::{
+    WorkflowEconomicsEvaluation, WorkflowEconomicsReport, to_markdown as workflow_to_markdown,
+};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -122,6 +125,12 @@ pub struct EconomicsDecisionReport {
     pub selection: EconomicsSelection,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowEconomicsDecisionReport {
+    pub workflow: WorkflowEconomicsReport,
+    pub selection: EconomicsSelection,
+}
+
 pub fn select(report: &EconomicsReport, policy: &EconomicsPolicy) -> Result<EconomicsSelection> {
     policy.validate()?;
     let mut eligible = Vec::new();
@@ -190,6 +199,55 @@ pub fn select_batch(
     }
 
     eligible.sort_by(|left, right| compare_batch(left, right, &policy.objective));
+    excluded.sort_by(|left, right| {
+        left.provider
+            .cmp(&right.provider)
+            .then_with(|| left.offer_id.cmp(&right.offer_id))
+    });
+
+    let selected = eligible.first().map(|evaluation| SelectedEconomicsOffer {
+        provider: evaluation.provider.clone(),
+        offer_id: evaluation.offer_id.clone(),
+        effective_cost_usd: evaluation.effective_cost_usd,
+        time_to_green_ms: evaluation.time_to_green_ms,
+        pareto_optimal: evaluation.pareto_optimal,
+    });
+
+    Ok(EconomicsSelection {
+        schema_version: ECONOMICS_SELECTION_SCHEMA_VERSION,
+        policy_id: policy.policy_id.clone(),
+        policy_schema_version: policy.schema_version,
+        objective: policy.objective.clone(),
+        max_time_to_green_ms: policy.max_time_to_green_ms,
+        max_effective_cost_usd: policy.max_effective_cost_usd,
+        eligible_candidates: eligible.len(),
+        selected,
+        excluded,
+    })
+}
+
+pub fn select_workflow(
+    report: &WorkflowEconomicsReport,
+    policy: &EconomicsPolicy,
+) -> Result<EconomicsSelection> {
+    policy.validate()?;
+    let mut eligible = Vec::new();
+    let mut excluded = Vec::new();
+
+    for evaluation in &report.evaluations {
+        let reasons = workflow_exclusion_reasons(evaluation, policy);
+        if reasons.is_empty() {
+            eligible.push(evaluation);
+        } else {
+            excluded.push(EconomicsExclusion {
+                provider: evaluation.provider.clone(),
+                offer_id: evaluation.offer_id.clone(),
+                reasons,
+            });
+        }
+    }
+
+    eligible.sort_by(|left, right| compare_workflow(left, right, &policy.objective));
     excluded.sort_by(|left, right| {
         left.provider
             .cmp(&right.provider)
@@ -320,12 +378,112 @@ fn compare_batch(
     }
 }
 
+fn workflow_exclusion_reasons(
+    evaluation: &WorkflowEconomicsEvaluation,
+    policy: &EconomicsPolicy,
+) -> Vec<String> {
+    let mut reasons = Vec::new();
+
+    if let Some(limit) = policy.max_time_to_green_ms
+        && evaluation.time_to_green_ms > limit
+    {
+        reasons.push(format!(
+            "time_to_green_ms {} exceeds policy limit {}",
+            evaluation.time_to_green_ms, limit
+        ));
+    }
+
+    if let Some(limit) = policy.max_effective_cost_usd
+        && evaluation.effective_cost_usd > limit
+    {
+        reasons.push(format!(
+            "effective_cost_usd {:.6} exceeds policy limit {:.6}",
+            evaluation.effective_cost_usd, limit
+        ));
+    }
+
+    reasons
+}
+
+fn compare_workflow(
+    left: &WorkflowEconomicsEvaluation,
+    right: &WorkflowEconomicsEvaluation,
+    objective: &EconomicsObjective,
+) -> Ordering {
+    match objective {
+        EconomicsObjective::MinimizeEffectiveCost => left
+            .effective_cost_usd
+            .partial_cmp(&right.effective_cost_usd)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| left.time_to_green_ms.cmp(&right.time_to_green_ms))
+            .then_with(|| left.provider.cmp(&right.provider))
+            .then_with(|| left.offer_id.cmp(&right.offer_id)),
+        EconomicsObjective::MinimizeTimeToGreen => left
+            .time_to_green_ms
+            .cmp(&right.time_to_green_ms)
+            .then_with(|| {
+                left.effective_cost_usd
+                    .partial_cmp(&right.effective_cost_usd)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| left.provider.cmp(&right.provider))
+            .then_with(|| left.offer_id.cmp(&right.offer_id)),
+    }
+}
+
 pub fn to_markdown(report: &EconomicsDecisionReport) -> String {
     let mut output = economics_to_markdown(&report.economics);
     if let Some(batch) = &report.batch {
         output.push('\n');
         output.push_str(&batch_to_markdown(batch));
     }
+    output.push_str("\n## Deterministic selection\n\n");
+    output.push_str(&format!("- Policy: `{}`\n", report.selection.policy_id));
+    output.push_str(&format!("- Objective: `{}`\n", report.selection.objective));
+
+    if let Some(limit) = report.selection.max_time_to_green_ms {
+        output.push_str(&format!(
+            "- Max time-to-green: {:.2}s\n",
+            limit as f64 / 1000.0
+        ));
+    }
+    if let Some(limit) = report.selection.max_effective_cost_usd {
+        output.push_str(&format!("- Max effective cost: ${limit:.6}\n"));
+    }
+
+    output.push_str(&format!(
+        "- Eligible candidates: {}\n",
+        report.selection.eligible_candidates
+    ));
+
+    match &report.selection.selected {
+        Some(selected) => output.push_str(&format!(
+            "- Selected: `{}/{}` at ${:.6}, {:.2}s time-to-green\n",
+            selected.provider,
+            selected.offer_id,
+            selected.effective_cost_usd,
+            selected.time_to_green_ms as f64 / 1000.0
+        )),
+        None => output.push_str("- Selected: none\n"),
+    }
+
+    if !report.selection.excluded.is_empty() {
+        output.push_str("\n### Policy exclusions\n\n");
+        for excluded in &report.selection.excluded {
+            output.push_str(&format!(
+                "- `{}/{}`: {}\n",
+                excluded.provider,
+                excluded.offer_id,
+                excluded.reasons.join("; ")
+            ));
+        }
+    }
+
+    output
+}
+
+pub fn workflow_decision_to_markdown(report: &WorkflowEconomicsDecisionReport) -> String {
+    let mut output = workflow_to_markdown(&report.workflow);
     output.push_str("\n## Deterministic selection\n\n");
     output.push_str(&format!("- Policy: `{}`\n", report.selection.policy_id));
     output.push_str(&format!("- Objective: `{}`\n", report.selection.objective));
