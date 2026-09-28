@@ -188,4 +188,3 @@ fn report_handles_legacy_local_and_repository_scopes_together() {
     assert!(report.contains("| local | test | 1 |"));
     assert!(report.contains("| sergii/cishape | test | 1 |"));
 }
-
