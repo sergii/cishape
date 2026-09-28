@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cishape::advisory::{AdvisoryReport, advisory_item, to_markdown, ADVISORY_SCHEMA_VERSION};
+use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
@@ -392,11 +392,7 @@ fn advisory_command(
     for scope in scopes {
         let profile = store.profile_scope(&scope.job, scope.repository.as_deref())?;
         let recommendation = recommend(&profile, &catalog);
-        items.push(advisory_item(
-            &profile,
-            recommendation.as_ref(),
-            min_runs,
-        ));
+        items.push(advisory_item(&profile, recommendation.as_ref(), min_runs));
     }
 
     let report = AdvisoryReport {
