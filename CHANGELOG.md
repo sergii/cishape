@@ -19,6 +19,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add an opt-in live TypeSafe Jev transport that preserves the same fail-closed shadow boundary.
 - Add explicit live TypeSafe Jev transport with Rust TLS and preserved provider response evidence.
 - Add a manual GitHub Actions Jev shadow proof over rolling CIShape history.
+- Add a first-class deterministic DecisionProvider and local `decide` flow so Jev is not on the critical path.
 
 ### Documentation
 

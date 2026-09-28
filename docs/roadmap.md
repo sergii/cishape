@@ -74,9 +74,9 @@ Priorities:
 - rolling GitHub Actions history from main-branch artifacts
 - repository-safe historical report
 
-## VS4 - Jev decision experiment
+## VS4 - Decision providers
 
-Status: Shadow contract complete; live transport implemented pending first credentialed proof.
+Status: Deterministic provider is the primary path. Jev shadow/live adapters are implemented but deferred and non-blocking.
 
 Keep deterministic feasibility/ranking.
 
@@ -90,11 +90,23 @@ JEV1:
 
 JEV2 adds the explicit live TypeSafe HTTP transport while preserving raw response evidence and the same fail-closed validator.
 
-LIVE1 adds a manual GitHub Actions proof that consumes rolling history. The only remaining gate for the first real provider decision is configuring `JEV_API_KEY` and dispatching that workflow.
+LIVE1 adds a manual GitHub Actions Jev proof that consumes rolling history. Running it is optional and can happen later.
 
-Follow-ups add richer queue, price, latency-objective, provider-reliability context, and outcome evaluation after sufficient history exists.
+## VS5 - Deterministic advisory
 
-## VS5 - Cloud ingest
+Turn accumulated history into actionable, backend-free suggestions:
+
+- generate deterministic decisions for every workload scope
+- classify keep/downsize/upsize/no-decision
+- emit Markdown/JSON advisory reports
+- require minimum evidence before actionable changes
+- keep execution unchanged
+
+## VS6 - Provider catalogs and outcomes
+
+Add real provider runner aliases, prices, billing units, and outcome comparison so recommendations can be evaluated against later runs.
+
+## VS7 - Cloud ingest
 
 Only after local dogfood proves useful:
 
@@ -106,10 +118,10 @@ Only after local dogfood proves useful:
 
 Cloudflare is a possible hosting platform, not part of the core product identity.
 
-## VS6 - Advisory CI integration
+## VS8 - Advisory CI integration
 
 Emit suggestions for existing CI systems without changing workflows automatically.
 
-## VS7 - Controlled routing
+## VS9 - Controlled routing
 
 Only after advisory recommendations prove reliable, allow opt-in automation through existing CI control planes.

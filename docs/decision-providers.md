@@ -27,6 +27,22 @@ optional DecisionProvider
 
 A DecisionProvider never receives runner choices that failed hard CIShape resource constraints.
 
+## Deterministic provider
+
+The default provider is local and deterministic:
+
+```bash
+cishape decide \
+  --repository sergii/cishape \
+  test
+```
+
+It uses the same feasible candidate set as every optional provider, selects the deterministic optimizer baseline, and persists a DecisionRecord with provider `deterministic`.
+
+For an unchanged historical profile and algorithm version, the request identity is stable, so repeated recording is idempotent.
+
+No credentials, backend, or network access are required.
+
 ## Jev shadow provider
 
 JEV1 targets TypeSafe AI's Jev System One interface.
@@ -136,6 +152,10 @@ A transport error or non-success HTTP status produces no DecisionRecord. A synta
 
 JEV2 remains shadow-only and has no CI execution side effects.
 
+
+## Deferred Jev live proof
+
+The live Jev proof is implemented but intentionally optional. CIShape development does not wait for a Jev credential.
 
 ## Credentialed GitHub proof
 
