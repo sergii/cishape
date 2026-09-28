@@ -22,9 +22,12 @@ JobShape
 deterministic optimizer
     |
     v
-Recommendation
+Recommendation + feasible candidates
     |
-    + optional DecisionProvider (future)
+    + optional DecisionProvider
+    |      |
+    |      v
+    |   DecisionRecord
     |
     v
 CI control plane executes elsewhere
@@ -84,9 +87,11 @@ It must be reproducible and explainable without an LLM.
 
 ### Decision providers
 
-Optional future decision providers, including Jev, may choose among already-valid alternatives when policy trade-offs include queue state, price, latency objectives, provider reliability, or other uncertain context.
+Optional decision providers, beginning with a Jev shadow adapter, may choose among already-valid alternatives when policy trade-offs include price, queue state, latency objectives, provider reliability, or other uncertain context.
 
-Decision providers never bypass hard safety, trust, architecture, or resource constraints.
+The deterministic optimizer defines the feasible set first. A provider response outside that set fails closed. DecisionRecord is persisted separately from runtime observations and the deterministic recommendation so decisions can later be evaluated against actual outcomes.
+
+JEV1 has no execution side effects and no required network dependency.
 
 ### Execution
 

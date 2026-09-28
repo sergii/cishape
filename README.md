@@ -84,9 +84,22 @@ cargo run -- report --format markdown
 
 The repository also dogfoods rolling history in `.github/workflows/history.yml`: it downloads non-expired main-branch observation artifacts, imports their JSON evidence, exports canonical JSONL, renders a Markdown report, and uploads the resulting history bundle. No CIShape backend is required.
 
+## Shadow decisions
+
+CIShape can prepare a bounded Jev decision request without giving the decision provider control over feasibility or execution:
+
+```bash
+cargo run -- decision-prepare \
+  --repository sergii/cishape \
+  --output .cishape/decisions/test-request.json \
+  test
+```
+
+The request contains only deterministic feasible runner candidates. JEV1 is offline by design: a recorded Jev response can be validated and persisted with `decision-record`, while any choice outside the feasible set fails closed. Shadow decisions have no CI execution side effects.
+
 ## Direction
 
-The next slices extend portable interchange with OpenTelemetry/Parquet adapters and use accumulated history for richer recommendations.
+The next slices can add the live TypeSafe HTTP adapter, OpenTelemetry/Parquet interchange, and richer provider/queue/cost context after shadow decisions have enough historical evidence.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -98,6 +111,7 @@ See:
 - [CI strategy](docs/ci.md)
 - [Telemetry model v0](docs/telemetry-model-v0.md)
 - [Portable history](docs/portable-history.md)
+- [Decision providers](docs/decision-providers.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License

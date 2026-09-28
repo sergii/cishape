@@ -76,11 +76,19 @@ Priorities:
 
 ## VS4 - Jev decision experiment
 
+Status: In progress with offline shadow contract.
+
 Keep deterministic feasibility/ranking.
 
-Give Jev only already-valid alternatives plus history, price, queue, latency objectives, and policy context.
+JEV1:
 
-Persist DecisionRecord separately from Recommendation.
+- expose all deterministic feasible runner candidates
+- prepare the official Jev typed-choice request without a network dependency
+- reject choices outside the feasible set
+- persist DecisionRecord separately from Recommendation/RunObservation
+- compare Jev choice with the deterministic baseline in shadow mode
+
+Follow-ups add live API transport plus richer queue, price, latency-objective, and provider-reliability context after sufficient history exists.
 
 ## VS5 - Cloud ingest
 

@@ -1,8 +1,11 @@
 use anyhow::{Context, Result};
+use cishape::decision::{
+    JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_jev_response,
+};
 use cishape::interchange;
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation};
 use cishape::observe;
-use cishape::optimize::{default_catalog, recommend};
+use cishape::optimize::{default_catalog, feasible_candidates, recommend};
 use cishape::store::Store;
 use cishape::synthetic;
 use clap::{Parser, Subcommand, ValueEnum};
@@ -76,6 +79,29 @@ enum Command {
         #[arg(long, value_enum, default_value = "text")]
         format: ReportFormat,
     },
+    /// Prepare an offline Jev shadow decision request from historical evidence.
+    DecisionPrepare {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long, default_value = "jev-latest")]
+        model: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        job: String,
+    },
+    /// Record an offline Jev response as a shadow DecisionRecord.
+    DecisionRecord {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long)]
+        response: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Build a historical JobShape from stored runs.
     Profile {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -121,6 +147,19 @@ fn main() -> Result<()> {
             repository,
             format,
         } => report_command(&db, repository.as_deref(), format),
+        Command::DecisionPrepare {
+            db,
+            repository,
+            model,
+            output,
+            job,
+        } => decision_prepare_command(&db, repository.as_deref(), &job, &model, output.as_deref()),
+        Command::DecisionRecord {
+            db,
+            request,
+            response,
+            output,
+        } => decision_record_command(&db, &request, &response, output.as_deref()),
         Command::Profile {
             db,
             repository,
@@ -290,6 +329,99 @@ fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> 
         }
     }
 
+    Ok(())
+}
+
+fn decision_prepare_command(
+    db: &Path,
+    repository: Option<&str>,
+    job: &str,
+    model: &str,
+    output: Option<&Path>,
+) -> Result<()> {
+    let store = Store::open(db)?;
+    let profile = store.profile_for(job, repository)?;
+    let catalog = default_catalog();
+    let recommendation = recommend(&profile, &catalog)
+        .with_context(|| format!("no deterministic recommendation for {job}"))?;
+    let feasible = feasible_candidates(&profile, &catalog);
+    let bundle = prepare_jev_request(&profile, &recommendation, &feasible, Some(model))?;
+
+    let output_path = output
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from(format!(".cishape/decisions/{job}-jev-request.json")));
+    ensure_parent(&output_path)?;
+    std::fs::write(
+        &output_path,
+        serde_json::to_vec_pretty(&bundle).context("serialize Jev request bundle")?,
+    )
+    .with_context(|| format!("write {}", output_path.display()))?;
+
+    println!("prepared Jev shadow decision request");
+    println!("  workload          {}", job);
+    println!("  evidence runs     {}", profile.runs);
+    println!(
+        "  baseline          {}",
+        recommendation.recommended.shape.display_id()
+    );
+    println!("  feasible choices  {}", feasible.len());
+    println!("  model             {}", model);
+    println!("  request           {}", output_path.display());
+    Ok(())
+}
+
+fn decision_record_command(
+    db: &Path,
+    request_path: &Path,
+    response_path: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
+    let bundle: JevRequestBundle = serde_json::from_slice(
+        &std::fs::read(request_path).with_context(|| format!("read {}", request_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", request_path.display()))?;
+
+    let response: JevSystemOneResponse = serde_json::from_slice(
+        &std::fs::read(response_path)
+            .with_context(|| format!("read {}", response_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", response_path.display()))?;
+
+    let record = record_jev_response(&bundle, response)?;
+    let store = Store::open(db)?;
+    let inserted = store.insert_decision(&record)?;
+
+    let output_path = output.map(Path::to_path_buf).unwrap_or_else(|| {
+        let safe_request_id = record
+            .request_id
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                    character
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+        PathBuf::from(format!(".cishape/decisions/{safe_request_id}.json"))
+    });
+
+    ensure_parent(&output_path)?;
+    std::fs::write(
+        &output_path,
+        serde_json::to_vec_pretty(&record).context("serialize DecisionRecord")?,
+    )
+    .with_context(|| format!("write {}", output_path.display()))?;
+
+    println!("recorded Jev shadow decision");
+    println!("  workload          {}", record.job);
+    println!("  baseline          {}", record.deterministic_baseline);
+    println!("  selected          {}", record.selected_candidate);
+    println!("  confidence        {:.3}", record.confidence);
+    println!("  model             {}", record.model);
+    println!("  agrees baseline   {}", record.agrees_with_baseline);
+    println!("  stored            {}", inserted);
+    println!("  evidence          {}", output_path.display());
     Ok(())
 }
 

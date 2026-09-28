@@ -15,6 +15,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Dogfood CIShape by observing its own GitHub Actions workloads and uploading run evidence.
 - Add provider-neutral CI identity plus idempotent JSON/JSONL history import and export.
 - Aggregate rolling main-branch CI observations into a portable historical report.
+- Add an offline Jev shadow-decision contract over deterministic feasible runner candidates.
 
 ### Documentation
 
