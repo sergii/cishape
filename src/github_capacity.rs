@@ -10,6 +10,7 @@ pub const GITHUB_API_VERSION: &str = "2026-03-10";
 #[derive(Debug, Clone)]
 pub struct GitHubCapacityConfig {
     pub repository: String,
+    pub provider: String,
     pub offer_id: String,
     pub runner_label: String,
     pub parallel_slots: u32,
@@ -21,6 +22,7 @@ pub struct GitHubCapacityConfig {
 impl GitHubCapacityConfig {
     pub fn validate(&self) -> Result<()> {
         validate_repository(&self.repository)?;
+        anyhow::ensure!(!self.provider.trim().is_empty(), "provider is required");
         anyhow::ensure!(!self.offer_id.trim().is_empty(), "offer_id is required");
         anyhow::ensure!(
             !self.runner_label.trim().is_empty(),
@@ -100,7 +102,7 @@ impl GitHubCapacityClient {
                 config.repository
             ),
             states: vec![CapacityState {
-                provider: "github-actions".into(),
+                provider: config.provider.clone(),
                 offer_id: config.offer_id.clone(),
                 queue_depth,
                 running_jobs,
@@ -315,6 +317,7 @@ mod tests {
     fn config() -> GitHubCapacityConfig {
         GitHubCapacityConfig {
             repository: "owner/repo".into(),
+            provider: "github-actions".into(),
             offer_id: "ubuntu-latest-private-x64".into(),
             runner_label: "ubuntu-latest".into(),
             parallel_slots: 4,
