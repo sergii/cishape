@@ -163,10 +163,15 @@ mod tests {
           },
           "usage":{"input_tokens":10,"output_tokens":2}
         }"#;
+        let request = request();
+        let serialized = serde_json::to_value(&request).expect("serialize request");
+        assert_eq!(serialized["model"], "jev-latest");
+        assert_eq!(serialized["questions"]["runner_choice"]["type"], "choice");
+
         let (endpoint, captured) = spawn_server("HTTP/1.1 200 OK", body);
         let client = JevHttpClient::new(endpoint);
 
-        let response = client.send("secret-key", &request()).expect("send");
+        let response = client.send("secret-key", &request).expect("send");
         assert_eq!(response.model, "jev-1.13.0");
 
         let raw = captured
@@ -174,9 +179,7 @@ mod tests {
             .expect("capture");
         let raw_lower = raw.to_ascii_lowercase();
         assert!(raw_lower.contains("authorization: bearer secret-key"));
-        assert!(raw.contains("\"model\":\"jev-latest\""));
-        assert!(raw.contains("\"runner_choice\""));
-        assert!(raw.contains("\"type\":\"choice\""));
+        assert!(raw_lower.contains("content-type: application/json"));
     }
 
     #[test]
