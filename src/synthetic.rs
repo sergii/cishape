@@ -1,6 +1,4 @@
-use crate::model::{
-    GIB, MIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape,
-};
+use crate::model::{GIB, MIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
 
 const SYNTHETIC_EPOCH_MS: u64 = 1_700_000_000_000;
 
