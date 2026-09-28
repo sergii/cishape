@@ -1,4 +1,4 @@
-use crate::model::{RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
+use crate::model::{CiIdentity, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
 use anyhow::{Context, Result, anyhow};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -30,7 +30,7 @@ struct Accumulator {
 
 pub fn command(job: &str, program: &str, args: &[String]) -> Result<RunObservation> {
     let runner = detect_runner_shape()?;
-    let (provider, provider_runner) = detect_provider_metadata();
+    let (ci, runner_name) = detect_ci_identity();
     let observed_at_unix_ms = unix_time_ms()?;
     let rusage_before = child_rusage_cpu_seconds()?;
 
@@ -78,8 +78,10 @@ pub fn command(job: &str, program: &str, args: &[String]) -> Result<RunObservati
         read_bytes: accumulator.io_read_max.values().copied().sum(),
         write_bytes: accumulator.io_write_max.values().copied().sum(),
         runner,
-        provider,
-        provider_runner,
+        ci,
+        runner_name,
+        provider: None,
+        provider_runner: None,
         queue_ms: None,
         cost_usd: None,
         exit_code,
@@ -306,33 +308,78 @@ fn cgroup_memory_limit_bytes() -> Option<u64> {
     value.parse().ok()
 }
 
-fn detect_provider_metadata() -> (Option<String>, Option<String>) {
+fn detect_ci_identity() -> (CiIdentity, Option<String>) {
     if matches!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true")) {
         return (
-            Some("github-actions".into()),
+            CiIdentity {
+                provider: Some("github-actions".into()),
+                repository: std::env::var("GITHUB_REPOSITORY").ok(),
+                workflow: std::env::var("GITHUB_WORKFLOW").ok(),
+                run_id: std::env::var("GITHUB_RUN_ID").ok(),
+                run_attempt: std::env::var("GITHUB_RUN_ATTEMPT")
+                    .ok()
+                    .and_then(|value| value.parse().ok()),
+                workflow_job: std::env::var("GITHUB_JOB").ok(),
+                commit_sha: std::env::var("GITHUB_SHA").ok(),
+                git_ref: std::env::var("GITHUB_REF").ok(),
+            },
             std::env::var("RUNNER_NAME").ok(),
         );
     }
 
     if matches!(std::env::var("BUILDKITE").as_deref(), Ok("true")) {
         return (
-            Some("buildkite".into()),
+            CiIdentity {
+                provider: Some("buildkite".into()),
+                repository: std::env::var("BUILDKITE_REPO").ok(),
+                workflow: std::env::var("BUILDKITE_PIPELINE_SLUG").ok(),
+                run_id: std::env::var("BUILDKITE_BUILD_ID")
+                    .ok()
+                    .or_else(|| std::env::var("BUILDKITE_BUILD_NUMBER").ok()),
+                run_attempt: None,
+                workflow_job: std::env::var("BUILDKITE_LABEL").ok(),
+                commit_sha: std::env::var("BUILDKITE_COMMIT").ok(),
+                git_ref: std::env::var("BUILDKITE_BRANCH").ok(),
+            },
             std::env::var("BUILDKITE_AGENT_NAME").ok(),
         );
     }
 
     if matches!(std::env::var("GITLAB_CI").as_deref(), Ok("true")) {
         return (
-            Some("gitlab-ci".into()),
+            CiIdentity {
+                provider: Some("gitlab-ci".into()),
+                repository: std::env::var("CI_PROJECT_PATH").ok(),
+                workflow: std::env::var("CI_PIPELINE_NAME").ok(),
+                run_id: std::env::var("CI_PIPELINE_ID").ok(),
+                run_attempt: None,
+                workflow_job: std::env::var("CI_JOB_NAME").ok(),
+                commit_sha: std::env::var("CI_COMMIT_SHA").ok(),
+                git_ref: std::env::var("CI_COMMIT_REF_NAME").ok(),
+            },
             std::env::var("CI_RUNNER_DESCRIPTION").ok(),
         );
     }
 
     if std::env::var_os("JENKINS_URL").is_some() {
-        return (Some("jenkins".into()), std::env::var("NODE_NAME").ok());
+        return (
+            CiIdentity {
+                provider: Some("jenkins".into()),
+                repository: std::env::var("GIT_URL").ok(),
+                workflow: std::env::var("JOB_NAME").ok(),
+                run_id: std::env::var("BUILD_TAG")
+                    .ok()
+                    .or_else(|| std::env::var("BUILD_ID").ok()),
+                run_attempt: None,
+                workflow_job: std::env::var("STAGE_NAME").ok(),
+                commit_sha: std::env::var("GIT_COMMIT").ok(),
+                git_ref: std::env::var("GIT_BRANCH").ok(),
+            },
+            std::env::var("NODE_NAME").ok(),
+        );
     }
 
-    (None, None)
+    (CiIdentity::default(), None)
 }
 
 fn unix_time_ms() -> Result<u64> {

@@ -63,9 +63,22 @@ After the observer binary is built, CI runs its tests, Clippy, and demo through 
 
 This keeps the first real dataset completely OSS and backend-free.
 
+## Portable history
+
+Observations from ephemeral runners can be merged locally without CIShape Cloud:
+
+```bash
+cargo run -- import artifact-a/*.json artifact-b/*.json
+cargo run -- profile test
+cargo run -- profile --repository sergii/cishape test
+cargo run -- export --format jsonl --output history.jsonl
+```
+
+Imports are idempotent, and portable CI identity can correlate repository, workflow, run, job, commit, and ref across artifacts. If the same logical job name exists in multiple repositories, profiling requires an explicit `--repository` scope instead of silently mixing workloads.
+
 ## Direction
 
-The next slice makes observations portable across workflow runs and providers so multiple artifacts can become one historical dataset.
+The next slices extend portable interchange with OpenTelemetry/Parquet adapters and use accumulated history for richer recommendations.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -76,6 +89,7 @@ See:
 - [Roadmap](docs/roadmap.md)
 - [CI strategy](docs/ci.md)
 - [Telemetry model v0](docs/telemetry-model-v0.md)
+- [Portable history](docs/portable-history.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License

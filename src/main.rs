@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
+use cishape::interchange;
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation};
 use cishape::observe;
 use cishape::optimize::{default_catalog, recommend};
 use cishape::store::Store;
 use cishape::synthetic;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Parser)]
@@ -13,6 +14,11 @@ use std::path::{Path, PathBuf};
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum ExportFormat {
+    Jsonl,
 }
 
 #[derive(Debug, Subcommand)]
@@ -39,22 +45,44 @@ enum Command {
         #[arg(last = true, required = true, num_args = 1..)]
         command: Vec<String>,
     },
+    /// Import one or more portable RunObservation JSON/JSONL files.
+    Import {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
+    /// Export local history in a portable format.
+    Export {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long, value_enum, default_value = "jsonl")]
+        format: ExportFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Build a historical JobShape from stored runs.
     Profile {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
     /// Recommend the cheapest runner shape that satisfies v0 safety constraints.
     Recommend {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
         db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         job: String,
     },
 }
@@ -71,21 +99,35 @@ fn main() -> Result<()> {
             output,
             command,
         } => observe_command(&job, &db, output.as_deref(), &command),
-        Command::Profile { db, job } => {
+        Command::Import { db, files } => import_command(&db, &files),
+        Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
+        Command::Profile {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            print_profile(&store.profile(&job)?);
+            print_profile(&store.profile_for(&job, repository.as_deref())?);
             Ok(())
         }
-        Command::Recommend { db, job } => {
+        Command::Recommend {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            let profile = store.profile(&job)?;
+            let profile = store.profile_for(&job, repository.as_deref())?;
             let recommendation = recommendation_for(&profile)?;
             print_recommendation(&recommendation);
             Ok(())
         }
-        Command::Explain { db, job } => {
+        Command::Explain {
+            db,
+            repository,
+            job,
+        } => {
             let store = Store::open(&db)?;
-            let profile = store.profile(&job)?;
+            let profile = store.profile_for(&job, repository.as_deref())?;
             let recommendation = recommendation_for(&profile)?;
             print_explanation(&profile, &recommendation);
             Ok(())
@@ -156,6 +198,41 @@ fn observe_command(job: &str, db: &Path, output: Option<&Path>, command: &[Strin
     Ok(())
 }
 
+fn import_command(db: &Path, files: &[PathBuf]) -> Result<()> {
+    ensure_parent(db)?;
+    let observations = interchange::read_observations(files)?;
+    let total = observations.len();
+    let mut store = Store::open(db)?;
+    let inserted = store.insert_runs(&observations)?;
+
+    println!(
+        "imported {inserted} new observations; skipped {} duplicates",
+        total.saturating_sub(inserted)
+    );
+    Ok(())
+}
+
+fn export_command(db: &Path, format: ExportFormat, output: Option<&Path>) -> Result<()> {
+    let store = Store::open(db)?;
+    let runs = store.all_runs()?;
+
+    match (format, output) {
+        (ExportFormat::Jsonl, Some(path)) => {
+            ensure_parent(path)?;
+            let file = std::fs::File::create(path)
+                .with_context(|| format!("create {}", path.display()))?;
+            interchange::write_jsonl(&runs, file)?;
+            println!("exported {} observations to {}", runs.len(), path.display());
+        }
+        (ExportFormat::Jsonl, None) => {
+            let stdout = std::io::stdout();
+            interchange::write_jsonl(&runs, stdout.lock())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn default_observation_path(observation: &RunObservation) -> PathBuf {
     let job = observation
         .job
@@ -221,6 +298,9 @@ fn print_observation(observation: &RunObservation, output: &Path) {
 
 fn print_profile(profile: &JobShape) {
     println!("JobShape {}", profile.job);
+    if let Some(repository) = &profile.repository {
+        println!("  repository        {repository}");
+    }
     println!("  runs              {}", profile.runs);
     println!("  current runner    {}", profile.current_runner);
     println!(
@@ -243,6 +323,9 @@ fn print_profile(profile: &JobShape) {
 
 fn print_recommendation(recommendation: &Recommendation) {
     println!("Recommendation");
+    if let Some(repository) = &recommendation.repository {
+        println!("  repository        {repository}");
+    }
     println!("  current           {}", recommendation.current);
     println!("  recommended       {}", recommendation.recommended.shape);
     println!(
