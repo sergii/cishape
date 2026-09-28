@@ -96,8 +96,7 @@ fn demo() -> Result<()> {
 
 fn synth(path: &Path, job: &str, runs: usize) -> Result<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create {}", parent.display()))?;
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
 
     let mut store = Store::open(path)?;
@@ -120,8 +119,14 @@ fn print_profile(profile: &JobShape) {
     println!("JobShape {}", profile.job);
     println!("  runs              {}", profile.runs);
     println!("  current runner    {}", profile.current_runner);
-    println!("  duration p50      {:.2}s", profile.duration_p50_ms / 1000.0);
-    println!("  duration p95      {:.2}s", profile.duration_p95_ms / 1000.0);
+    println!(
+        "  duration p50      {:.2}s",
+        profile.duration_p50_ms / 1000.0
+    );
+    println!(
+        "  duration p95      {:.2}s",
+        profile.duration_p95_ms / 1000.0
+    );
     println!(
         "  CPU peak p95      {:.2} cores",
         profile.cpu_peak_p95_millis / 1000.0
@@ -142,8 +147,7 @@ fn print_recommendation(recommendation: &Recommendation) {
     );
     println!(
         "  estimated cost    ${:.5} -> ${:.5} per p95 run",
-        recommendation.current_estimated_cost_usd,
-        recommendation.recommended_estimated_cost_usd
+        recommendation.current_estimated_cost_usd, recommendation.recommended_estimated_cost_usd
     );
     println!(
         "  estimated saving  {:.1}%",
@@ -169,9 +173,7 @@ fn print_explanation(profile: &JobShape, recommendation: &Recommendation) {
         recommendation.recommended.shape.cpu_cores(),
         recommendation.recommended.shape.memory_bytes as f64 / GIB as f64
     );
-    println!(
-        "  v0 only selects candidates that preserve 1.5x CPU and memory safety margins."
-    );
+    println!("  v0 only selects candidates that preserve 1.5x CPU and memory safety margins.");
     println!(
         "  v0 applies a conservative 5% latency penalty instead of pretending to know workload scaling."
     );
