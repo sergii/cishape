@@ -135,3 +135,18 @@ prepared request
 A transport error or non-success HTTP status produces no DecisionRecord. A syntactically valid response that selects an infeasible candidate is saved as provider evidence but still fails before a DecisionRecord is accepted.
 
 JEV2 remains shadow-only and has no CI execution side effects.
+
+
+## Credentialed GitHub proof
+
+The repository includes a manual-only `Jev Shadow Proof` workflow.
+
+It reads a repository secret named `JEV_API_KEY`, downloads the newest non-expired `cishape-history-*` artifact, prepares a bounded request from that rolling history, performs one live Jev call, validates it through the same fail-closed path, and uploads:
+
+- the prepared request
+- the raw Jev response
+- the validated DecisionRecord
+
+The workflow has only `contents: read` and `actions: read` permissions and never performs runner routing or workflow mutation.
+
+This workflow is intentionally `workflow_dispatch` only. It does not run on pushes, pull requests, or a schedule.
