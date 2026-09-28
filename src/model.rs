@@ -160,6 +160,7 @@ pub struct RunnerCandidate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recommendation {
     pub job: String,
+    pub repository: Option<String>,
     pub current: RunnerShape,
     pub recommended: RunnerCandidate,
     pub predicted_p95_ms: f64,
