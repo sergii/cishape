@@ -15,7 +15,10 @@ fn observe_records_a_successful_command() {
     assert!(observation.memory_peak_bytes > 0);
 
     let json = serde_json::to_string(&observation).expect("serialize");
-    assert!(json.contains(&format!("\"schema_version\":{}", cishape::model::RUN_OBSERVATION_SCHEMA_VERSION)));
+    assert!(json.contains(&format!(
+        "\"schema_version\":{}",
+        cishape::model::RUN_OBSERVATION_SCHEMA_VERSION
+    )));
 }
 
 #[test]
