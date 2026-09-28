@@ -10,11 +10,31 @@ fn catalog_path() -> PathBuf {
 fn checked_in_provider_catalog_validates() {
     let catalog = ProviderCatalog::load(&catalog_path()).expect("catalog");
     assert_eq!(catalog.schema_version, 1);
-    assert!(catalog.offers.iter().any(|offer| offer.provider == "github-actions"));
+    assert!(
+        catalog
+            .offers
+            .iter()
+            .any(|offer| offer.provider == "github-actions")
+    );
     assert!(catalog.offers.iter().any(|offer| offer.provider == "depot"));
-    assert!(catalog.offers.iter().any(|offer| offer.provider == "blacksmith"));
-    assert!(catalog.offers.iter().any(|offer| offer.provider == "namespace"));
-    assert!(catalog.offers.iter().any(|offer| offer.provider == "hetzner"));
+    assert!(
+        catalog
+            .offers
+            .iter()
+            .any(|offer| offer.provider == "blacksmith")
+    );
+    assert!(
+        catalog
+            .offers
+            .iter()
+            .any(|offer| offer.provider == "namespace")
+    );
+    assert!(
+        catalog
+            .offers
+            .iter()
+            .any(|offer| offer.provider == "hetzner")
+    );
 }
 
 #[test]
