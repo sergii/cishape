@@ -5,6 +5,9 @@ use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
 };
+use cishape::economics::{
+    CapacitySnapshot, evaluate as evaluate_economics, to_markdown as economics_to_markdown,
+};
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation, RunnerShape};
@@ -46,6 +49,12 @@ enum AdvisoryFormat {
 
 #[derive(Clone, Debug, ValueEnum)]
 enum OutcomeFormat {
+    Json,
+    Markdown,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum EconomicsFormat {
     Json,
     Markdown,
 }
@@ -105,6 +114,23 @@ enum Command {
         memory_gib: u64,
         #[arg(long)]
         duration_ms: u64,
+    },
+    /// Evaluate provider offers against a runtime queue/capacity snapshot.
+    Economics {
+        #[arg(long, default_value = "catalogs/providers-v1.json")]
+        catalog: PathBuf,
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        cpu: u32,
+        #[arg(long)]
+        memory_gib: u64,
+        #[arg(long)]
+        duration_ms: u64,
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: EconomicsFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     /// Build a deterministic advisory report over all workload scopes.
     Advisory {
@@ -244,6 +270,23 @@ fn main() -> Result<()> {
             memory_gib,
             duration_ms,
         } => catalog_fit_command(&path, cpu, memory_gib, duration_ms),
+        Command::Economics {
+            catalog,
+            snapshot,
+            cpu,
+            memory_gib,
+            duration_ms,
+            format,
+            output,
+        } => economics_command(
+            &catalog,
+            &snapshot,
+            cpu,
+            memory_gib,
+            duration_ms,
+            format,
+            output.as_deref(),
+        ),
         Command::Advisory {
             db,
             repository,
@@ -505,6 +548,46 @@ fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64)
             offer.billed_seconds,
             offer.estimated_cost_usd
         );
+    }
+
+    Ok(())
+}
+
+fn economics_command(
+    catalog_path: &Path,
+    snapshot_path: &Path,
+    cpu: u32,
+    memory_gib: u64,
+    duration_ms: u64,
+    format: EconomicsFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    anyhow::ensure!(cpu > 0, "CPU must be positive");
+    anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
+    anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
+
+    let catalog = ProviderCatalog::load(catalog_path)?;
+    let snapshot = CapacitySnapshot::load(snapshot_path)?;
+    let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
+    let report = evaluate_economics(&catalog, &snapshot, &target, duration_ms)?;
+
+    let payload = match format {
+        EconomicsFormat::Json => {
+            serde_json::to_string_pretty(&report).context("serialize economics report")?
+        }
+        EconomicsFormat::Markdown => economics_to_markdown(&report),
+    };
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote capacity economics report to {}", path.display());
+    } else {
+        print!("{payload}");
+        if !payload.ends_with('\n') {
+            println!();
+        }
     }
 
     Ok(())

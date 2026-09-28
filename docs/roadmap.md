@@ -139,9 +139,26 @@ OUTCOME1:
 - Markdown/JSON outcome evidence remains local and deterministic
 - no causal claim is made from temporal correlation alone
 
-Next: model queue/capacity economics and surface advisory results directly in CI.
+Next: surface economics-aware advisory results directly in CI.
 
-## VS8 - Cloud ingest
+## VS8 - Capacity economics
+
+Status: CAPACITY1 implemented.
+
+CAPACITY1:
+
+- keep runtime queue/capacity observations separate from static provider catalog facts
+- model queue wait from queue depth, running jobs, parallel slots, and slot turnover
+- model warm/cold cache state with an explicit cold-cache penalty
+- preserve provider billing increments for managed runners
+- allocate persistent fixed-server cost using explicit utilization and parallel-slot capacity
+- emit effective runtime, queue wait, billed time, effective cost, and time-to-green
+- mark Pareto-optimal offers without collapsing cost and latency into a hidden score
+- remain local, deterministic, and read-only
+
+Next: add policy/SLA objectives over the economics report and ingest real runtime capacity snapshots from provider adapters.
+
+## VS9 - Cloud ingest
 
 Only after local dogfood proves useful:
 
@@ -153,10 +170,10 @@ Only after local dogfood proves useful:
 
 Cloudflare is a possible hosting platform, not part of the core product identity.
 
-## VS9 - Advisory CI integration
+## VS10 - Advisory CI integration
 
 Emit suggestions for existing CI systems without changing workflows automatically.
 
-## VS10 - Controlled routing
+## VS11 - Controlled routing
 
 Only after advisory recommendations prove reliable, allow opt-in automation through existing CI control planes.

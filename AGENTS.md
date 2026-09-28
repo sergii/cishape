@@ -29,6 +29,10 @@ CIShape is not a CI control plane and must not become one by accident.
 - Provider prices and machine offers are dated observations with provenance, not eternal constants.
 - Never fabricate missing provider capacity, billing increments, or prices. Incomplete offers may remain visible but must not become selectable candidates.
 - Do not compare fixed self-hosted server pricing to ephemeral per-job runner pricing without an explicit utilization/capacity model.
+- Runtime queue/capacity snapshots are time-scoped observations and must remain separate from static provider catalog facts.
+- Queue wait must come from explicit concurrency/turnover inputs; do not invent provider queue behavior.
+- Cache effects must be explicit evidence. A warm cache has no penalty; a cold cache penalty must be supplied rather than guessed.
+- Keep effective cost and time-to-green as separate dimensions unless a versioned policy explicitly combines or constrains them.
 - Outcome evaluation is observational. Never claim a runner caused a failure or latency change from temporal correlation alone.
 - OpenTelemetry CI/CD semantics should be reused where they fit instead of inventing equivalent vocabulary.
 - The local-first path must remain useful without signup or a network service.
