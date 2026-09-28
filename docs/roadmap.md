@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1 implemented.
+Status: CAPACITY1 and CAPACITY2 implemented.
 
 CAPACITY1:
 
@@ -156,7 +156,16 @@ CAPACITY1:
 - mark Pareto-optimal offers without collapsing cost and latency into a hidden score
 - remain local, deterministic, and read-only
 
-Next: add policy/SLA objectives over the economics report and ingest real runtime capacity snapshots from provider adapters.
+CAPACITY2:
+
+- version economics selection policy as checked data
+- support minimize-effective-cost with an optional time-to-green SLA
+- support minimize-time-to-green with an optional effective-cost budget
+- emit explicit eligibility/exclusion evidence
+- preserve deterministic tie-breaking with no hidden weighted score
+- keep selection advisory-only with no routing side effects
+
+Next: ingest real runtime capacity snapshots from provider adapters and surface economics-aware advisory results directly in CI.
 
 ## VS9 - Cloud ingest
 
