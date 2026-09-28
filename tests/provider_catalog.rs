@@ -92,6 +92,14 @@ fn target_fit_uses_only_comparable_managed_offers() {
 
     assert!(fits.iter().any(|fit| fit.provider == "github-actions"));
     assert!(fits.iter().any(|fit| fit.provider == "depot"));
+    assert!(
+        fits.iter()
+            .all(|fit| fit.offer_id != "ubuntu-latest-public-x64")
+    );
+    assert!(
+        fits.iter()
+            .all(|fit| fit.offer_id != "ubuntu-latest-private-x64")
+    );
     assert!(!fits.iter().any(|fit| fit.provider == "blacksmith"));
     assert!(!fits.iter().any(|fit| fit.provider == "namespace"));
     assert!(!fits.iter().any(|fit| fit.provider == "hetzner"));
