@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-28",
+  "offers": [
+    {
+      "provider": "github-actions",
+      "offer_id": "ubuntu-latest-private-x64",
+      "runner_label": "ubuntu-latest",
+      "capacity": {
+        "cpu_millis": 2000,
+        "memory_bytes": 8589934592
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0.006,
+        "billing_increment_seconds": 60,
+        "context": "Baseline paid Linux x64 rate for private repositories after included minutes; public standard runners may be free."
+      },
+      "source_url": "https://docs.github.com/en/billing/reference/actions-runner-pricing",
+      "observed_at": "2026-09-28",
+      "notes": "GitHub documents 2 CPU / 8 GB for standard private-repository Ubuntu runners."
+    },
+    {
+      "provider": "github-actions",
+      "offer_id": "linux-4-core-x64",
+      "runner_label": "linux-4-core",
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_bytes": 17179869184
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0.012,
+        "billing_increment_seconds": 60,
+        "context": "GitHub-hosted larger Linux x64 runner; larger runners are billed even when public."
+      },
+      "source_url": "https://docs.github.com/en/billing/reference/actions-runner-pricing",
+      "observed_at": "2026-09-28"
+    },
+    {
+      "provider": "depot",
+      "offer_id": "depot-ubuntu-24.04",
+      "runner_label": "depot-ubuntu-24.04",
+      "capacity": {
+        "cpu_millis": 2000,
+        "memory_bytes": 8589934592
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0.006,
+        "billing_increment_seconds": 1,
+        "context": "Published runner rate; plan-included minutes and subscription fees are not allocated into per-job cost."
+      },
+      "source_url": "https://depot.dev/docs/github-actions/runner-types",
+      "observed_at": "2026-09-28",
+      "notes": "Depot states runner usage is tracked by the second with no one-minute minimum."
+    },
+    {
+      "provider": "depot",
+      "offer_id": "depot-ubuntu-24.04-4",
+      "runner_label": "depot-ubuntu-24.04-4",
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_bytes": 17179869184
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0.012,
+        "billing_increment_seconds": 1,
+        "context": "Published runner rate; plan-included minutes and subscription fees are not allocated into per-job cost."
+      },
+      "source_url": "https://depot.dev/docs/github-actions/runner-types",
+      "observed_at": "2026-09-28"
+    },
+    {
+      "provider": "blacksmith",
+      "offer_id": "ubuntu-x64-2vcpu",
+      "runner_label": "blacksmith-2vcpu-ubuntu-2404",
+      "capacity": {
+        "cpu_millis": 2000,
+        "memory_bytes": null
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_ephemeral",
+      "pricing": {
+        "kind": "per_minute",
+        "usd_per_minute": 0.004,
+        "billing_increment_seconds": null,
+        "context": "Published Ubuntu x64 2-vCPU rate. Memory size and billing increment were not verified in the source snapshot."
+      },
+      "source_url": "https://www.blacksmith.sh/pricing",
+      "observed_at": "2026-09-28",
+      "notes": "Visible but intentionally non-selectable until both capacity and billing increment are verified."
+    },
+    {
+      "provider": "namespace",
+      "offer_id": "linux-amd64-configurable",
+      "runner_label": null,
+      "capacity": {
+        "cpu_millis": null,
+        "memory_bytes": null
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "managed_configurable",
+      "pricing": {
+        "kind": "unknown",
+        "reason": "Namespace exposes configurable runner profiles; an exact current public price/shape pair was not verified for this snapshot."
+      },
+      "source_url": "https://namespace.so/",
+      "observed_at": "2026-09-28",
+      "notes": "Provider is represented without invented capacity or pricing. Later adapters may ingest workspace-specific profile data."
+    },
+    {
+      "provider": "hetzner",
+      "offer_id": "cx33-eu-central",
+      "runner_label": null,
+      "capacity": {
+        "cpu_millis": 4000,
+        "memory_bytes": 8589934592
+      },
+      "os": "linux",
+      "architecture": "x86_64",
+      "execution_model": "self_hosted_vm",
+      "pricing": {
+        "kind": "fixed_server",
+        "usd_per_hour": 0.016,
+        "monthly_cap_usd": 9.99,
+        "context": "EU Central published USD price, excluding VAT and IPv4. Fixed-capacity host economics depend on utilization."
+      },
+      "source_url": "https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/",
+      "observed_at": "2026-09-28",
+      "region": "eu-central",
+      "notes": "Not ranked against ephemeral per-job offers in CATALOG1."
+    }
+  ]
+}

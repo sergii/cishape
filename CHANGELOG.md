@@ -21,6 +21,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add a manual GitHub Actions Jev shadow proof over rolling CIShape history.
 - Add a first-class deterministic DecisionProvider and local `decide` flow so Jev is not on the critical path.
 - Add deterministic Markdown/JSON advisory reports with evidence gating and rolling-history GitHub Actions dogfood.
+- Add versioned provider catalogs with pricing provenance, billing increments, incomplete-data safety, and deterministic managed-offer fitting.
 
 ### Documentation
 

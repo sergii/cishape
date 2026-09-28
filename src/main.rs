@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
+use cishape::catalog::ProviderCatalog;
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
-use cishape::model::{GIB, JobShape, Recommendation, RunObservation};
+use cishape::model::{GIB, JobShape, Recommendation, RunObservation, RunnerShape};
 use cishape::observe;
 use cishape::optimize::{default_catalog, feasible_candidates, recommend};
 use cishape::store::Store;
@@ -78,6 +79,22 @@ enum Command {
         format: ExportFormat,
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Inspect a versioned provider runner catalog.
+    Catalog {
+        #[arg(long, default_value = "catalogs/providers-v1.json")]
+        path: PathBuf,
+    },
+    /// Fit a canonical target shape to comparable managed provider offers.
+    CatalogFit {
+        #[arg(long, default_value = "catalogs/providers-v1.json")]
+        path: PathBuf,
+        #[arg(long)]
+        cpu: u32,
+        #[arg(long)]
+        memory_gib: u64,
+        #[arg(long)]
+        duration_ms: u64,
     },
     /// Build a deterministic advisory report over all workload scopes.
     Advisory {
@@ -189,6 +206,13 @@ fn main() -> Result<()> {
         } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Import { db, files } => import_command(&db, &files),
         Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
+        Command::Catalog { path } => catalog_command(&path),
+        Command::CatalogFit {
+            path,
+            cpu,
+            memory_gib,
+            duration_ms,
+        } => catalog_fit_command(&path, cpu, memory_gib, duration_ms),
         Command::Advisory {
             db,
             repository,
@@ -368,6 +392,66 @@ fn export_command(db: &Path, format: ExportFormat, output: Option<&Path>) -> Res
             let stdout = std::io::stdout();
             interchange::write_jsonl(&runs, stdout.lock())?;
         }
+    }
+
+    Ok(())
+}
+
+fn catalog_command(path: &Path) -> Result<()> {
+    let catalog = ProviderCatalog::load(path)?;
+
+    println!(
+        "Provider catalog v{} observed {}",
+        catalog.schema_version, catalog.observed_at
+    );
+    println!();
+    println!("provider\toffer\tcapacity\texecution\tpricing");
+
+    for offer in catalog.offers {
+        println!(
+            "{}\t{}\t{}\t{:?}\t{}",
+            offer.provider,
+            offer.offer_id,
+            offer.capacity.display(),
+            offer.execution_model,
+            offer.pricing.display()
+        );
+    }
+
+    Ok(())
+}
+
+fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64) -> Result<()> {
+    anyhow::ensure!(cpu > 0, "CPU must be positive");
+    anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
+    anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
+
+    let catalog = ProviderCatalog::load(path)?;
+    let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
+    let matches = catalog.fit(&target, duration_ms);
+
+    println!(
+        "Provider fits for {} at {:.2}s",
+        target.display_id(),
+        duration_ms as f64 / 1000.0
+    );
+
+    if matches.is_empty() {
+        println!("  no comparable managed offers");
+        return Ok(());
+    }
+
+    for offer in matches {
+        let label = offer.runner_label.as_deref().unwrap_or("-");
+        println!(
+            "  {} / {} / {} / {} / billed {}s / ${:.6}",
+            offer.provider,
+            offer.offer_id,
+            label,
+            offer.shape.display_id(),
+            offer.billed_seconds,
+            offer.estimated_cost_usd
+        );
     }
 
     Ok(())

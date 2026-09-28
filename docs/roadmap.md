@@ -105,11 +105,24 @@ Turn accumulated history into actionable, backend-free suggestions:
 - dogfood the report from rolling GitHub Actions history
 - keep execution unchanged
 
-## VS6 - Provider catalogs and outcomes
+## VS6 - Provider catalogs
 
-Add real provider runner aliases, prices, billing units, and outcome comparison so recommendations can be evaluated against later runs.
+Status: CATALOG1 implemented for dated offline snapshots and per-job offer fitting.
 
-## VS7 - Cloud ingest
+- provider runner aliases
+- complete or explicitly incomplete CPU/RAM capacity
+- OS/architecture/execution model
+- dated price provenance
+- billing increments
+- fixed-server pricing kept separate from ephemeral per-job pricing
+
+Next: refresh adapters/API-backed catalogs where providers expose reliable machine/price data.
+
+## VS7 - Policy and outcomes
+
+Move safety factors/evidence thresholds/objectives into explicit policy and compare recommendations with later observed outcomes.
+
+## VS8 - Cloud ingest
 
 Only after local dogfood proves useful:
 
@@ -121,10 +134,10 @@ Only after local dogfood proves useful:
 
 Cloudflare is a possible hosting platform, not part of the core product identity.
 
-## VS8 - Advisory CI integration
+## VS9 - Advisory CI integration
 
 Emit suggestions for existing CI systems without changing workflows automatically.
 
-## VS9 - Controlled routing
+## VS10 - Controlled routing
 
 Only after advisory recommendations prove reliable, allow opt-in automation through existing CI control planes.
