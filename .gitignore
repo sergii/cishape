@@ -1,0 +1,5 @@
+/target/
+.cishape/
+*.duckdb
+*.duckdb.wal
+.DS_Store
