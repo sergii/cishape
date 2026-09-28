@@ -8,8 +8,7 @@ use cishape::decision::{
 };
 use cishape::economics::{CacheState, CapacitySnapshot, evaluate as evaluate_economics};
 use cishape::economics_advisory::{
-    build_report as build_economics_advisory,
-    to_markdown as economics_advisory_to_markdown,
+    build_report as build_economics_advisory, to_markdown as economics_advisory_to_markdown,
 };
 use cishape::economics_policy::{
     EconomicsDecisionReport, EconomicsPolicy, WorkflowEconomicsDecisionReport,
@@ -918,8 +917,9 @@ fn economics_advisory_command(
         &economics_policy,
     )?;
     let payload = match format {
-        AdvisoryFormat::Json => serde_json::to_string_pretty(&report)
-            .context("serialize economics advisory report")?,
+        AdvisoryFormat::Json => {
+            serde_json::to_string_pretty(&report).context("serialize economics advisory report")?
+        }
         AdvisoryFormat::Markdown => economics_advisory_to_markdown(&report),
     };
 
