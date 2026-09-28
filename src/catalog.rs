@@ -48,10 +48,25 @@ impl ProviderCatalog {
     }
 
     pub fn fit(&self, target: &RunnerShape, predicted_duration_ms: u64) -> Vec<OfferFit> {
+        self.fit_with_visibility(target, predicted_duration_ms, None)
+    }
+
+    pub fn fit_with_visibility(
+        &self,
+        target: &RunnerShape,
+        predicted_duration_ms: u64,
+        repository_visibility: Option<RepositoryVisibility>,
+    ) -> Vec<OfferFit> {
         let mut matches = self
             .offers
             .iter()
-            .filter_map(|offer| offer.fit(target, predicted_duration_ms))
+            .filter_map(|offer| {
+                offer.fit(
+                    target,
+                    predicted_duration_ms,
+                    repository_visibility.as_ref(),
+                )
+            })
             .collect::<Vec<_>>();
 
         matches.sort_by(|left, right| {
@@ -91,6 +106,22 @@ impl RunnerCapacity {
                     .unwrap_or_else(|| "? GiB".into());
                 format!("{cpu}/{memory}")
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RepositoryVisibility {
+    Public,
+    Private,
+}
+
+impl std::fmt::Display for RepositoryVisibility {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Public => write!(formatter, "public"),
+            Self::Private => write!(formatter, "private"),
         }
     }
 }
@@ -159,6 +190,8 @@ pub struct RunnerOffer {
     pub os: String,
     pub architecture: String,
     pub execution_model: ExecutionModel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_visibility: Option<RepositoryVisibility>,
     pub pricing: OfferPricing,
     pub source_url: String,
     pub observed_at: String,
@@ -220,8 +253,19 @@ impl RunnerOffer {
         Ok(())
     }
 
-    fn fit(&self, target: &RunnerShape, predicted_duration_ms: u64) -> Option<OfferFit> {
+    fn fit(
+        &self,
+        target: &RunnerShape,
+        predicted_duration_ms: u64,
+        repository_visibility: Option<&RepositoryVisibility>,
+    ) -> Option<OfferFit> {
         if self.execution_model != ExecutionModel::ManagedEphemeral {
+            return None;
+        }
+
+        if let Some(required_visibility) = &self.repository_visibility
+            && repository_visibility != Some(required_visibility)
+        {
             return None;
         }
 
@@ -288,6 +332,7 @@ mod tests {
             os: "linux".into(),
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::ManagedEphemeral,
+            repository_visibility: None,
             pricing: OfferPricing::PerMinute {
                 usd_per_minute,
                 billing_increment_seconds,
@@ -306,8 +351,8 @@ mod tests {
         let complete = offer("complete", 2, 8, 0.006, Some(1));
         let unknown_billing = offer("unknown-billing", 2, 8, 0.004, None);
 
-        assert!(complete.fit(&target, 11_000).is_some());
-        assert!(unknown_billing.fit(&target, 11_000).is_none());
+        assert!(complete.fit(&target, 11_000, None).is_some());
+        assert!(unknown_billing.fit(&target, 11_000, None).is_none());
     }
 
     #[test]
@@ -316,8 +361,8 @@ mod tests {
         let per_minute = offer("minute", 2, 8, 0.006, Some(60));
         let per_second = offer("second", 2, 8, 0.006, Some(1));
 
-        let minute = per_minute.fit(&target, 11_000).expect("fit");
-        let second = per_second.fit(&target, 11_000).expect("fit");
+        let minute = per_minute.fit(&target, 11_000, None).expect("fit");
+        let second = per_second.fit(&target, 11_000, None).expect("fit");
 
         assert_eq!(minute.billed_seconds, 60);
         assert_eq!(second.billed_seconds, 11);
@@ -337,6 +382,7 @@ mod tests {
             os: "linux".into(),
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
+            repository_visibility: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: Some(9.99),
