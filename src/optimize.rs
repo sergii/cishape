@@ -98,6 +98,9 @@ mod tests {
         };
 
         let recommendation = recommend(&profile, &default_catalog()).expect("recommendation");
-        assert_eq!(recommendation.recommended.shape, RunnerShape::new(2_000, 4 * GIB));
+        assert_eq!(
+            recommendation.recommended.shape,
+            RunnerShape::new(2_000, 4 * GIB)
+        );
     }
 }
