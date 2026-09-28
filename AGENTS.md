@@ -29,6 +29,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - Provider prices and machine offers are dated observations with provenance, not eternal constants.
 - Never fabricate missing provider capacity, billing increments, or prices. Incomplete offers may remain visible but must not become selectable candidates.
 - Do not compare fixed self-hosted server pricing to ephemeral per-job runner pricing without an explicit utilization/capacity model.
+- Outcome evaluation is observational. Never claim a runner caused a failure or latency change from temporal correlation alone.
 - OpenTelemetry CI/CD semantics should be reused where they fit instead of inventing equivalent vocabulary.
 - The local-first path must remain useful without signup or a network service.
 
