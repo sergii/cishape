@@ -142,10 +142,13 @@ cargo run -- catalog
 cargo run -- catalog-fit \
   --cpu 2 \
   --memory-gib 4 \
-  --duration-ms 11000
+  --duration-ms 11000 \
+  --repository-visibility public
 ```
 
 Provider records carry pricing provenance and billing semantics. Missing RAM, price, or billing increments are kept as unknown rather than fabricated. CATALOG1 still keeps fixed self-hosted VM pricing separate from ephemeral per-job fitting.
+
+CATALOG2 makes repository context explicit where a provider reuses one runner label for different products. For GitHub standard `ubuntu-latest`, public and private repositories are separate offers. Use `catalog-fit --repository-visibility public|private` when evaluating those contextual offers; omitting visibility excludes them instead of guessing.
 
 ## Capacity economics
 
