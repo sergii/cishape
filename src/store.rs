@@ -221,8 +221,11 @@ impl Store {
 
     pub fn profile_for(&self, job: &str, repository: Option<&str>) -> Result<JobShape> {
         let repository = self.resolve_repository_scope(job, repository)?;
+        self.profile_scope(job, repository.as_deref())
+    }
 
-        let aggregate = if let Some(repository) = repository.as_deref() {
+    pub fn profile_scope(&self, job: &str, repository: Option<&str>) -> Result<JobShape> {
+        let aggregate = if let Some(repository) = repository {
             self.connection.query_row(
                 r#"
                 SELECT
@@ -254,7 +257,9 @@ impl Store {
             )?
         };
 
-        let current = if let Some(repository) = repository.as_deref() {
+        anyhow::ensure!(aggregate.0 > 0, "no observations for workload scope");
+
+        let current = if let Some(repository) = repository {
             self.connection.query_row(
                 r#"
                 SELECT runner_cpu_millis, runner_memory_bytes
@@ -282,7 +287,7 @@ impl Store {
 
         Ok(JobShape {
             job: job.to_string(),
-            repository,
+            repository: repository.map(str::to_string),
             runs: aggregate.0 as u64,
             duration_p50_ms: aggregate.1,
             duration_p95_ms: aggregate.2,
