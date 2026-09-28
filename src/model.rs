@@ -141,6 +141,7 @@ impl RunObservation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobShape {
     pub job: String,
+    pub repository: Option<String>,
     pub runs: u64,
     pub duration_p50_ms: f64,
     pub duration_p95_ms: f64,
