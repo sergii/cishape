@@ -258,9 +258,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    fn spawn_server(
-        responses: Vec<&'static str>,
-    ) -> (String, mpsc::Receiver<Vec<String>>) {
+    fn spawn_server(responses: Vec<&'static str>) -> (String, mpsc::Receiver<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let address = listener.local_addr().expect("address");
         let (tx, rx) = mpsc::channel();
