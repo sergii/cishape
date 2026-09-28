@@ -607,7 +607,11 @@ mod tests {
         }];
 
         let error = count_active_jobs(&jobs, &plan).expect_err("ambiguous match must fail");
-        assert!(error.to_string().contains("matches multiple capacity pools"));
+        assert!(
+            error
+                .to_string()
+                .contains("matches multiple capacity pools")
+        );
     }
 
     #[test]
