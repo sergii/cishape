@@ -16,8 +16,7 @@ fn jev_shadow_decision_is_persisted_idempotently() {
     let catalog = default_catalog();
     let recommendation = recommend(&profile, &catalog).expect("recommendation");
     let feasible = feasible_candidates(&profile, &catalog);
-    let bundle =
-        prepare_jev_request(&profile, &recommendation, &feasible, None).expect("prepare");
+    let bundle = prepare_jev_request(&profile, &recommendation, &feasible, None).expect("prepare");
 
     let selected = recommendation.recommended.name.clone();
     let probabilities = feasible
