@@ -4,7 +4,21 @@ use std::fmt;
 pub const MIB: u64 = 1024 * 1024;
 pub const GIB: u64 = 1024 * MIB;
 
-pub const RUN_OBSERVATION_SCHEMA_VERSION: u32 = 1;
+pub const RUN_OBSERVATION_SCHEMA_VERSION: u32 = 2;
+pub const MIN_SUPPORTED_RUN_OBSERVATION_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CiIdentity {
+    pub provider: Option<String>,
+    pub repository: Option<String>,
+    pub workflow: Option<String>,
+    pub run_id: Option<String>,
+    pub run_attempt: Option<u64>,
+    pub workflow_job: Option<String>,
+    pub commit_sha: Option<String>,
+    pub git_ref: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunnerShape {
@@ -14,10 +28,7 @@ pub struct RunnerShape {
 
 impl RunnerShape {
     pub const fn new(cpu_millis: u32, memory_bytes: u64) -> Self {
-        Self {
-            cpu_millis,
-            memory_bytes,
-        }
+        Self { cpu_millis, memory_bytes }
     }
 
     pub fn cpu_cores(&self) -> f64 {
@@ -57,11 +68,59 @@ pub struct RunObservation {
     pub read_bytes: u64,
     pub write_bytes: u64,
     pub runner: RunnerShape,
+    #[serde(default)]
+    pub ci: CiIdentity,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runner_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_runner: Option<String>,
     pub queue_ms: Option<u64>,
     pub cost_usd: Option<f64>,
     pub exit_code: i32,
+}
+
+impl RunObservation {
+    pub fn canonicalize(mut self) -> Self {
+        if self.ci.provider.is_none() {
+            self.ci.provider = self.provider.take();
+        }
+        if self.runner_name.is_none() {
+            self.runner_name = self.provider_runner.take();
+        }
+        self.provider = None;
+        self.provider_runner = None;
+        if self.schema_version < RUN_OBSERVATION_SCHEMA_VERSION {
+            self.schema_version = RUN_OBSERVATION_SCHEMA_VERSION;
+        }
+        self
+    }
+
+    pub fn observation_id(&self) -> String {
+        let provider = self.ci.provider.as_deref().or(self.provider.as_deref()).unwrap_or("local");
+        let repository = self.ci.repository.as_deref().unwrap_or("-");
+        let workflow = self.ci.workflow.as_deref().unwrap_or("-");
+        let run_id = self.ci.run_id.as_deref().unwrap_or("-");
+        let run_attempt = self.ci.run_attempt.map(|value| value.to_string()).unwrap_or_else(|| "-".into());
+        let workflow_job = self.ci.workflow_job.as_deref().unwrap_or("-");
+        format!("{provider}:{repository}:{workflow}:{run_id}:{run_attempt}:{workflow_job}:{}:{}", self.job, self.observed_at_unix_ms)
+    }
+
+    pub fn validate_schema(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.schema_version >= MIN_SUPPORTED_RUN_OBSERVATION_SCHEMA_VERSION,
+            "unsupported RunObservation schema version {}",
+            self.schema_version
+        );
+        anyhow::ensure!(
+            self.schema_version <= RUN_OBSERVATION_SCHEMA_VERSION,
+            "RunObservation schema version {} is newer than supported version {}",
+            self.schema_version,
+            RUN_OBSERVATION_SCHEMA_VERSION
+        );
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,8 +162,40 @@ mod tests {
     #[test]
     fn runner_shape_has_stable_external_and_display_ids() {
         let shape = RunnerShape::new(8_000, 16 * GIB);
-
         assert_eq!(shape.id(), "cpu8-mem16");
         assert_eq!(shape.display_id(), "CPU8-MEM16");
+    }
+
+    #[test]
+    fn observation_id_is_stable_for_ci_identity() {
+        let observation = RunObservation {
+            schema_version: RUN_OBSERVATION_SCHEMA_VERSION,
+            job: "test".into(),
+            observed_at_unix_ms: 123,
+            duration_ms: 10,
+            cpu_seconds: 0.1,
+            cpu_peak_millis: 100,
+            memory_peak_bytes: MIB,
+            read_bytes: 0,
+            write_bytes: 0,
+            runner: RunnerShape::new(2_000, 4 * GIB),
+            ci: CiIdentity {
+                provider: Some("github-actions".into()),
+                repository: Some("acme/api".into()),
+                workflow: Some("CI".into()),
+                run_id: Some("42".into()),
+                run_attempt: Some(1),
+                workflow_job: Some("check".into()),
+                commit_sha: Some("abc".into()),
+                git_ref: Some("refs/heads/main".into()),
+            },
+            runner_name: Some("runner".into()),
+            provider: None,
+            provider_runner: None,
+            queue_ms: None,
+            cost_usd: None,
+            exit_code: 0,
+        };
+        assert_eq!(observation.observation_id(), "github-actions:acme/api:CI:42:1:check:test:123");
     }
 }
