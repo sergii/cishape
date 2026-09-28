@@ -26,12 +26,14 @@ impl DecisionMode {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionProvider {
+    Deterministic,
     Jev,
 }
 
 impl DecisionProvider {
     pub const fn as_str(&self) -> &'static str {
         match self {
+            Self::Deterministic => "deterministic",
             Self::Jev => "jev",
         }
     }
@@ -138,6 +140,65 @@ pub struct DecisionRecord {
     pub model: String,
     pub usage: JevUsage,
     pub agrees_with_baseline: bool,
+}
+
+pub fn record_deterministic_decision(
+    profile: &JobShape,
+    recommendation: &Recommendation,
+    feasible: &[FeasibleCandidate],
+) -> Result<DecisionRecord> {
+    anyhow::ensure!(!feasible.is_empty(), "no feasible runner candidates");
+    anyhow::ensure!(
+        feasible
+            .iter()
+            .any(|candidate| candidate.name == recommendation.recommended.name),
+        "deterministic recommendation is not in the feasible candidate set"
+    );
+
+    let selected = recommendation.recommended.name.clone();
+    let probabilities = feasible
+        .iter()
+        .map(|candidate| {
+            (
+                candidate.name.clone(),
+                if candidate.name == selected { 1.0 } else { 0.0 },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    Ok(DecisionRecord {
+        schema_version: DECISION_SCHEMA_VERSION,
+        request_id: deterministic_request_id(profile, recommendation),
+        recorded_at_unix_ms: unix_time_ms()?,
+        mode: DecisionMode::Shadow,
+        provider: DecisionProvider::Deterministic,
+        repository: profile.repository.clone(),
+        job: profile.job.clone(),
+        evidence_runs: profile.runs,
+        deterministic_baseline: selected.clone(),
+        selected_candidate: selected,
+        confidence: 1.0,
+        probabilities,
+        model: recommendation.algorithm.clone(),
+        usage: JevUsage {
+            input_tokens: 0,
+            output_tokens: 0,
+        },
+        agrees_with_baseline: true,
+    })
+}
+
+fn deterministic_request_id(profile: &JobShape, recommendation: &Recommendation) -> String {
+    let repository = profile.repository.as_deref().unwrap_or("local");
+    format!(
+        "deterministic:{repository}:{}:{}:{:.0}:{:.0}:{:.0}:{}",
+        profile.job,
+        profile.runs,
+        profile.duration_p95_ms,
+        profile.cpu_peak_p95_millis,
+        profile.memory_peak_p99_bytes,
+        recommendation.algorithm
+    )
 }
 
 pub fn prepare_jev_request(
@@ -322,6 +383,29 @@ mod tests {
             memory_peak_p99_bytes: 800.0 * MIB as f64,
             current_runner: RunnerShape::new(16_000, 64 * GIB),
         }
+    }
+
+    #[test]
+    fn deterministic_decision_matches_baseline_and_is_stable() {
+        let profile = profile();
+        let catalog = default_catalog();
+        let feasible = feasible_candidates(&profile, &catalog);
+        let recommendation = recommend(&profile, &catalog).expect("recommendation");
+
+        let first =
+            record_deterministic_decision(&profile, &recommendation, &feasible).expect("decision");
+        let second =
+            record_deterministic_decision(&profile, &recommendation, &feasible).expect("decision");
+
+        assert_eq!(first.provider, DecisionProvider::Deterministic);
+        assert_eq!(first.selected_candidate, recommendation.recommended.name);
+        assert!(first.agrees_with_baseline);
+        assert_eq!(first.confidence, 1.0);
+        assert_eq!(first.request_id, second.request_id);
+        assert_eq!(
+            first.probabilities[&first.selected_candidate],
+            1.0
+        );
     }
 
     #[test]
