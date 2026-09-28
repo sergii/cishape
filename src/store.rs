@@ -1,6 +1,6 @@
 use crate::model::{JobShape, RunObservation, RunnerShape};
 use anyhow::{Context, Result};
-use duckdb::{params, Connection};
+use duckdb::{Connection, params};
 use std::path::Path;
 
 pub struct Store {
@@ -16,7 +16,8 @@ impl Store {
     }
 
     pub fn open(path: &Path) -> Result<Self> {
-        let connection = Connection::open(path).with_context(|| format!("open DuckDB at {}", path.display()))?;
+        let connection =
+            Connection::open(path).with_context(|| format!("open DuckDB at {}", path.display()))?;
         let store = Self { connection };
         store.migrate()?;
         Ok(store)
