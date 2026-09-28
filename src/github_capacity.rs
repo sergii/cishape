@@ -230,7 +230,16 @@ fn validate_repository(repository: &str) -> Result<()> {
         !owner.trim().is_empty() && !name.trim().is_empty() && !name.contains('/'),
         "repository must be in owner/name form"
     );
+    anyhow::ensure!(
+        owner.chars().all(is_url_safe_repository_char)
+            && name.chars().all(is_url_safe_repository_char),
+        "repository contains unsupported URL characters"
+    );
     Ok(())
+}
+
+fn is_url_safe_repository_char(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
 }
 
 fn observed_at_now() -> Result<String> {
@@ -350,7 +359,9 @@ mod tests {
                 .contains("authorization: bearer secret-token")
         }));
         assert!(requests.iter().all(|request| {
-            request.contains(&format!("X-GitHub-Api-Version: {GITHUB_API_VERSION}"))
+            request
+                .to_ascii_lowercase()
+                .contains(&format!("x-github-api-version: {GITHUB_API_VERSION}"))
         }));
     }
 
