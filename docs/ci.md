@@ -86,6 +86,38 @@ Checks are ordered by expected cost:
 
 As new checks are added, put the cheapest high-signal checks first and avoid parallelism when it would duplicate a large native build merely to save a few seconds of wall time.
 
+## Economics advisory dogfood
+
+The existing `CI Advisory` workflow always produces the deterministic sizing advisory from rolling DuckDB history.
+
+CAPACITY8 adds an optional live economics path:
+
+```text
+rolling history
++ explicit GitHubCapacityPlan
+-> live CapacitySnapshot
+-> economics-aware advisory
+-> step summary + artifacts
+```
+
+No capacity defaults are embedded in the workflow. If no plan is configured, the economics section is skipped and the summary states that no synthetic capacity facts were substituted.
+
+Manual runs can pass a repository-relative plan path through the `capacity_plan` workflow input. Automatic `workflow_run` dogfood activates only when this real-evidence file exists:
+
+```text
+config/cishape/github-capacity-plan.json
+```
+
+An explicitly requested missing plan fails closed. The capacity collection uses only `contents: read` and `actions: read` permissions plus the ephemeral `github.token`; it does not dispatch, cancel, or rewrite workflows.
+
+The uploaded advisory artifact contains the deterministic advisory on every run and, when enabled:
+
+- `capacity.json`
+- `economics-advisory.md`
+- `economics-advisory.json`
+
+The checked-in example plan remains illustrative and is never used automatically as live evidence.
+
 ## Future optimizations
 
 Only add these when measurements justify them:
