@@ -1,3 +1,4 @@
+use crate::decision::DecisionRecord;
 use crate::model::{CiIdentity, JobShape, RunObservation, RunnerShape, WorkloadScope};
 use anyhow::{Context, Result};
 use duckdb::{Connection, params};
@@ -51,6 +52,26 @@ impl Store {
                 queue_ms BIGINT,
                 cost_usd DOUBLE,
                 exit_code INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS decisions (
+                request_id VARCHAR PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                recorded_at_unix_ms BIGINT NOT NULL,
+                provider VARCHAR NOT NULL,
+                mode VARCHAR NOT NULL,
+                ci_repository VARCHAR,
+                job VARCHAR NOT NULL,
+                evidence_runs BIGINT NOT NULL,
+                deterministic_baseline VARCHAR NOT NULL,
+                selected_candidate VARCHAR NOT NULL,
+                confidence DOUBLE NOT NULL,
+                probabilities_json VARCHAR NOT NULL,
+                model VARCHAR NOT NULL,
+                input_tokens BIGINT NOT NULL,
+                output_tokens BIGINT NOT NULL,
+                agrees_with_baseline BOOLEAN NOT NULL,
+                record_json VARCHAR NOT NULL
             );
             "#,
         )?;
@@ -118,6 +139,44 @@ impl Store {
         }
         tx.commit()?;
         Ok(inserted)
+    }
+
+    pub fn insert_decision(&self, record: &DecisionRecord) -> Result<bool> {
+        let probabilities_json =
+            serde_json::to_string(&record.probabilities).context("serialize decision probabilities")?;
+        let record_json = serde_json::to_string(record).context("serialize DecisionRecord")?;
+
+        let inserted = self.connection.execute(
+            r#"
+            INSERT OR IGNORE INTO decisions (
+                request_id, schema_version, recorded_at_unix_ms, provider, mode,
+                ci_repository, job, evidence_runs, deterministic_baseline,
+                selected_candidate, confidence, probabilities_json, model,
+                input_tokens, output_tokens, agrees_with_baseline, record_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+            params![
+                record.request_id,
+                record.schema_version as i64,
+                record.recorded_at_unix_ms as i64,
+                record.provider.as_str(),
+                record.mode.as_str(),
+                record.repository,
+                record.job,
+                record.evidence_runs as i64,
+                record.deterministic_baseline,
+                record.selected_candidate,
+                record.confidence,
+                probabilities_json,
+                record.model,
+                record.usage.input_tokens as i64,
+                record.usage.output_tokens as i64,
+                record.agrees_with_baseline,
+                record_json,
+            ],
+        )?;
+
+        Ok(inserted == 1)
     }
 
     pub fn all_runs(&self) -> Result<Vec<RunObservation>> {
