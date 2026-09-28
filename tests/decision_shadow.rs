@@ -61,8 +61,7 @@ fn wire_request_uses_typed_choice_question() {
     let catalog = default_catalog();
     let recommendation = recommend(&profile, &catalog).expect("recommendation");
     let feasible = feasible_candidates(&profile, &catalog);
-    let bundle =
-        prepare_jev_request(&profile, &recommendation, &feasible, None).expect("prepare");
+    let bundle = prepare_jev_request(&profile, &recommendation, &feasible, None).expect("prepare");
 
     let json = serde_json::to_value(&bundle.wire).expect("serialize");
     assert_eq!(json["model"], "jev-latest");
