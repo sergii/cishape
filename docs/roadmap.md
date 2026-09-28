@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, and CAPACITY6 implemented.
+Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, CAPACITY6, and CAPACITY7 implemented.
 
 CAPACITY1:
 
@@ -208,7 +208,18 @@ CAPACITY6:
 - emit one time-scoped CapacitySnapshot with all pool states
 - preserve the CAPACITY5 single-pool API/CLI
 
-Next: connect live capacity snapshots to economics-aware CI advisory evidence and add provider-specific discovery where reliable.
+CAPACITY7:
+
+- build a versioned economics advisory over historical workload scopes
+- gate provider selection on OptimizationPolicy min_runs
+- reuse the deterministic runner recommendation as the canonical target
+- feed recommendation predicted p95 into current capacity economics
+- apply ProviderCatalog and EconomicsPolicy without provider-specific branches
+- distinguish insufficient_evidence, no_runner_candidate, no_eligible_offer, and selected
+- preserve full EconomicsReport/EconomicsSelection evidence in JSON
+- remain advisory-only
+
+Next: dogfood live multi-pool economics advisory in GitHub Actions and add provider-specific discovery where reliable.
 
 ## VS9 - Cloud ingest
 

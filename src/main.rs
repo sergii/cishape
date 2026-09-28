@@ -7,6 +7,9 @@ use cishape::decision::{
     record_jev_response,
 };
 use cishape::economics::{CacheState, CapacitySnapshot, evaluate as evaluate_economics};
+use cishape::economics_advisory::{
+    build_report as build_economics_advisory, to_markdown as economics_advisory_to_markdown,
+};
 use cishape::economics_policy::{
     EconomicsDecisionReport, EconomicsPolicy, WorkflowEconomicsDecisionReport,
     select as select_economics, select_batch as select_batch_economics,
@@ -195,6 +198,25 @@ enum Command {
         jobs: u32,
         #[arg(long, value_enum, default_value = "markdown")]
         format: EconomicsFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Build provider economics advisory from historical workload evidence.
+    EconomicsAdvisory {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long, default_value = "catalogs/providers-v1.json")]
+        catalog: PathBuf,
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        optimization_policy: PathBuf,
+        #[arg(long, default_value = "policies/economics-default-v1.json")]
+        economics_policy: PathBuf,
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: AdvisoryFormat,
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -405,6 +427,22 @@ fn main() -> Result<()> {
             &policy,
             (cpu, memory_gib, jobs),
             duration_ms,
+            format,
+            output.as_deref(),
+        ),
+        Command::EconomicsAdvisory {
+            db,
+            repository,
+            catalog,
+            snapshot,
+            optimization_policy,
+            economics_policy,
+            format,
+            output,
+        } => economics_advisory_command(
+            (&db, &catalog, &snapshot),
+            repository.as_deref(),
+            (&optimization_policy, &economics_policy),
             format,
             output.as_deref(),
         ),
@@ -839,6 +877,57 @@ fn economics_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote capacity economics report to {}", path.display());
+    } else {
+        print!("{payload}");
+        if !payload.ends_with('\n') {
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+fn economics_advisory_command(
+    data_paths: (&Path, &Path, &Path),
+    repository: Option<&str>,
+    policy_paths: (&Path, &Path),
+    format: AdvisoryFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    let (db_path, catalog_path, snapshot_path) = data_paths;
+    let (optimization_policy_path, economics_policy_path) = policy_paths;
+    let optimization_policy = OptimizationPolicy::load(optimization_policy_path)?;
+    let economics_policy = EconomicsPolicy::load(economics_policy_path)?;
+    let catalog = ProviderCatalog::load(catalog_path)?;
+    let snapshot = CapacitySnapshot::load(snapshot_path)?;
+    let store = Store::open(db_path)?;
+    let scopes = store.workload_scopes(repository)?;
+    anyhow::ensure!(!scopes.is_empty(), "history is empty");
+
+    let mut profiles = Vec::with_capacity(scopes.len());
+    for scope in scopes {
+        profiles.push(store.profile_scope(&scope.job, scope.repository.as_deref())?);
+    }
+
+    let report = build_economics_advisory(
+        &profiles,
+        &optimization_policy,
+        &catalog,
+        &snapshot,
+        &economics_policy,
+    )?;
+    let payload = match format {
+        AdvisoryFormat::Json => {
+            serde_json::to_string_pretty(&report).context("serialize economics advisory report")?
+        }
+        AdvisoryFormat::Markdown => economics_advisory_to_markdown(&report),
+    };
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote economics-aware advisory to {}", path.display());
     } else {
         print!("{payload}");
         if !payload.ends_with('\n') {
