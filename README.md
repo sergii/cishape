@@ -7,12 +7,12 @@ CIShape is an early-stage open-source experiment for profiling CI workloads and 
 Canonical runner capacity is numeric:
 
 ```text
-C2-M4   = 2 vCPU / 4 GiB RAM
-C4-M8   = 4 vCPU / 8 GiB RAM
-C8-M16  = 8 vCPU / 16 GiB RAM
+CPU2-MEM4   = 2 vCPU / 4 GiB RAM
+CPU4-MEM8   = 4 vCPU / 8 GiB RAM
+CPU8-MEM16  = 8 vCPU / 16 GiB RAM
 ```
 
-CPU and memory remain separate dimensions.
+CPU and memory remain separate dimensions. External machine-readable IDs use lowercase hyphenated forms such as `cpu8-mem16`; human-facing output uses `CPU8-MEM16`.
 
 ## POC0
 
