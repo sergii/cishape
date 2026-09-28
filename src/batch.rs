@@ -2,7 +2,6 @@ use crate::economics::{CapacitySnapshot, EconomicsReport};
 use crate::model::RunnerShape;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 
 pub const BATCH_ECONOMICS_REPORT_SCHEMA_VERSION: u32 = 1;
 
