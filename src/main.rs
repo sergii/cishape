@@ -145,6 +145,7 @@ fn observe_command(job: &str, db: &Path, output: Option<&Path>, command: &[Strin
     ensure_parent(db)?;
     let mut store = Store::open(db)?;
     store.insert_runs(std::slice::from_ref(&observation))?;
+    drop(store);
 
     print_observation(&observation, &output_path);
 
