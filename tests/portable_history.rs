@@ -113,3 +113,41 @@ fn profiles_require_repository_scope_when_job_names_overlap() {
     assert_eq!(profile.repository.as_deref(), Some("acme/api"));
     assert_eq!(profile.runs, 1);
 }
+
+#[test]
+fn report_summarizes_repository_workloads_as_markdown() {
+    let dir = tempdir().expect("tempdir");
+    let db = dir.path().join("history.duckdb");
+
+    let mut first = observation();
+    first.observed_at_unix_ms = 1;
+    first.ci.run_id = Some("1".into());
+
+    let mut second = observation();
+    second.observed_at_unix_ms = 2;
+    second.ci.run_id = Some("2".into());
+    second.duration_ms = 3_000;
+
+    let mut store = Store::open(&db).expect("open store");
+    store.insert_runs(&[first, second]).expect("insert history");
+    drop(store);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cishape"))
+        .args([
+            "report",
+            "--db",
+            db.to_str().expect("db path"),
+            "--repository",
+            "sergii/cishape",
+            "--format",
+            "markdown",
+        ])
+        .output()
+        .expect("run report");
+
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("utf8 report");
+    assert!(report.contains("| Repository | Job | Runs |"));
+    assert!(report.contains("| sergii/cishape | test | 2 |"));
+}
+
