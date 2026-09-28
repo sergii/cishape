@@ -36,7 +36,7 @@ A single job is intentional. Step failure already prevents later expensive steps
 
 ## Cancellation
 
-The `check` job is scoped by PR number or ref:
+The entire workflow is scoped by PR number or ref:
 
 ```yaml
 concurrency:
@@ -44,9 +44,9 @@ concurrency:
   cancel-in-progress: true
 ```
 
-A new commit therefore supersedes the older expensive job for the same PR/ref.
+A new commit therefore supersedes the entire older workflow for the same PR/ref, including an expensive compilation that is already running.
 
-Job-level concurrency is used instead of workflow-level concurrency so a newer workflow run does not wait behind a stale workflow merely to get permission to cancel it.
+Because CIShape now uses one validation job, workflow-level cancellation is the simplest control-plane boundary and does not duplicate runner startup.
 
 ## DuckDB
 
