@@ -16,6 +16,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add provider-neutral CI identity plus idempotent JSON/JSONL history import and export.
 - Aggregate rolling main-branch CI observations into a portable historical report.
 - Add an offline Jev shadow-decision contract over deterministic feasible runner candidates.
+- Add an opt-in live TypeSafe Jev transport that preserves the same fail-closed shadow boundary.
 - Add explicit live TypeSafe Jev transport with Rust TLS and preserved provider response evidence.
 
 ### Documentation
