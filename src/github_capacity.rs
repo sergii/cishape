@@ -1,11 +1,13 @@
 use crate::economics::{CacheState, CapacitySnapshot, CapacityState};
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_GITHUB_API_BASE: &str = "https://api.github.com";
 pub const GITHUB_API_VERSION: &str = "2026-03-10";
+pub const GITHUB_CAPACITY_PLAN_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone)]
 pub struct GitHubCapacityConfig {
@@ -22,12 +24,101 @@ pub struct GitHubCapacityConfig {
 impl GitHubCapacityConfig {
     pub fn validate(&self) -> Result<()> {
         validate_repository(&self.repository)?;
+        self.pool().validate()
+    }
+
+    fn pool(&self) -> GitHubCapacityPool {
+        GitHubCapacityPool {
+            provider: self.provider.clone(),
+            offer_id: self.offer_id.clone(),
+            required_labels: vec![self.runner_label.clone()],
+            parallel_slots: self.parallel_slots,
+            slot_turnover_ms: self.slot_turnover_ms,
+            cache_state: self.cache_state.clone(),
+            cache_penalty_ms: self.cache_penalty_ms,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubCapacityPlan {
+    pub schema_version: u32,
+    pub pools: Vec<GitHubCapacityPool>,
+}
+
+impl GitHubCapacityPlan {
+    pub fn load(path: &Path) -> Result<Self> {
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read GitHub capacity plan {}", path.display()))?;
+        let plan: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse GitHub capacity plan {}", path.display()))?;
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            self.schema_version == GITHUB_CAPACITY_PLAN_SCHEMA_VERSION,
+            "unsupported GitHub capacity plan schema version {}",
+            self.schema_version
+        );
+        anyhow::ensure!(
+            !self.pools.is_empty(),
+            "GitHub capacity plan must contain at least one pool"
+        );
+
+        let mut identities = BTreeSet::new();
+        let mut selectors = BTreeSet::new();
+        for pool in &self.pools {
+            pool.validate()?;
+            anyhow::ensure!(
+                identities.insert((pool.provider.clone(), pool.offer_id.clone())),
+                "duplicate GitHub capacity pool {}/{}",
+                pool.provider,
+                pool.offer_id
+            );
+
+            let mut selector = pool.required_labels.clone();
+            selector.sort();
+            anyhow::ensure!(
+                selectors.insert(selector),
+                "duplicate GitHub capacity runner-label selector"
+            );
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubCapacityPool {
+    pub provider: String,
+    pub offer_id: String,
+    pub required_labels: Vec<String>,
+    pub parallel_slots: u32,
+    pub slot_turnover_ms: u64,
+    pub cache_state: CacheState,
+    pub cache_penalty_ms: u64,
+}
+
+impl GitHubCapacityPool {
+    fn validate(&self) -> Result<()> {
         anyhow::ensure!(!self.provider.trim().is_empty(), "provider is required");
         anyhow::ensure!(!self.offer_id.trim().is_empty(), "offer_id is required");
         anyhow::ensure!(
-            !self.runner_label.trim().is_empty(),
-            "runner_label is required"
+            !self.required_labels.is_empty(),
+            "required_labels must contain at least one label"
         );
+
+        let mut labels = BTreeSet::new();
+        for label in &self.required_labels {
+            anyhow::ensure!(!label.trim().is_empty(), "runner label is required");
+            anyhow::ensure!(
+                labels.insert(label),
+                "duplicate required runner label {label}"
+            );
+        }
+
         anyhow::ensure!(self.parallel_slots > 0, "parallel_slots must be positive");
         anyhow::ensure!(
             self.slot_turnover_ms > 0,
@@ -40,6 +131,12 @@ impl GitHubCapacityConfig {
             );
         }
         Ok(())
+    }
+
+    fn matches(&self, labels: &[String]) -> bool {
+        self.required_labels
+            .iter()
+            .all(|required| labels.iter().any(|label| label == required))
     }
 }
 
@@ -62,56 +159,55 @@ impl GitHubCapacityClient {
     }
 
     pub fn collect(&self, token: &str, config: &GitHubCapacityConfig) -> Result<CapacitySnapshot> {
+        config.validate()?;
+        let plan = GitHubCapacityPlan {
+            schema_version: GITHUB_CAPACITY_PLAN_SCHEMA_VERSION,
+            pools: vec![config.pool()],
+        };
+        self.collect_plan(token, &config.repository, &plan)
+    }
+
+    pub fn collect_plan(
+        &self,
+        token: &str,
+        repository: &str,
+        plan: &GitHubCapacityPlan,
+    ) -> Result<CapacitySnapshot> {
         anyhow::ensure!(!token.trim().is_empty(), "GitHub token is empty");
         anyhow::ensure!(!self.api_base.is_empty(), "GitHub API base is empty");
-        config.validate()?;
+        validate_repository(repository)?;
+        plan.validate()?;
 
         let observed_at = observed_at_now()?;
-        let run_ids = self.active_run_ids(token, &config.repository)?;
-        let mut queue_depth = 0_u32;
-        let mut running_jobs = 0_u32;
-
+        let run_ids = self.active_run_ids(token, repository)?;
+        let mut jobs = Vec::new();
         for run_id in run_ids {
-            for job in self.jobs_for_run(token, &config.repository, run_id)? {
-                let labels = job.labels.as_deref().unwrap_or_default();
-                if !labels.iter().any(|label| label == &config.runner_label) {
-                    continue;
-                }
-
-                match job.status.as_str() {
-                    "queued" => {
-                        queue_depth = queue_depth
-                            .checked_add(1)
-                            .ok_or_else(|| anyhow::anyhow!("queued job count overflow"))?;
-                    }
-                    "in_progress" => {
-                        running_jobs = running_jobs
-                            .checked_add(1)
-                            .ok_or_else(|| anyhow::anyhow!("running job count overflow"))?;
-                    }
-                    _ => {}
-                }
-            }
+            jobs.extend(self.jobs_for_run(token, repository, run_id)?);
         }
+
+        let counts = count_active_jobs(&jobs, plan)?;
+        let states = plan
+            .pools
+            .iter()
+            .zip(counts)
+            .map(|(pool, (queue_depth, running_jobs))| CapacityState {
+                provider: pool.provider.clone(),
+                offer_id: pool.offer_id.clone(),
+                queue_depth,
+                running_jobs,
+                parallel_slots: pool.parallel_slots,
+                slot_turnover_ms: pool.slot_turnover_ms,
+                cache_state: pool.cache_state.clone(),
+                cache_penalty_ms: pool.cache_penalty_ms,
+                utilization: None,
+            })
+            .collect();
 
         let snapshot = CapacitySnapshot {
             schema_version: 1,
             observed_at,
-            source: format!(
-                "github-actions-rest-v{GITHUB_API_VERSION}:{}",
-                config.repository
-            ),
-            states: vec![CapacityState {
-                provider: config.provider.clone(),
-                offer_id: config.offer_id.clone(),
-                queue_depth,
-                running_jobs,
-                parallel_slots: config.parallel_slots,
-                slot_turnover_ms: config.slot_turnover_ms,
-                cache_state: config.cache_state.clone(),
-                cache_penalty_ms: config.cache_penalty_ms,
-                utilization: None,
-            }],
+            source: format!("github-actions-rest-v{GITHUB_API_VERSION}:{repository}"),
+            states,
         };
         snapshot.validate()?;
         Ok(snapshot)
@@ -199,6 +295,63 @@ impl GitHubCapacityClient {
             .read_json::<T>()
             .with_context(|| format!("parse GitHub response from {url}"))
     }
+}
+
+fn count_active_jobs(
+    jobs: &[WorkflowJobSummary],
+    plan: &GitHubCapacityPlan,
+) -> Result<Vec<(u32, u32)>> {
+    let mut counts = vec![(0_u32, 0_u32); plan.pools.len()];
+
+    for job in jobs {
+        if !matches!(job.status.as_str(), "queued" | "in_progress") {
+            continue;
+        }
+
+        let labels = job.labels.as_deref().unwrap_or_default();
+        let matching = plan
+            .pools
+            .iter()
+            .enumerate()
+            .filter(|(_, pool)| pool.matches(labels))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        if matching.len() > 1 {
+            let identities = matching
+                .iter()
+                .map(|index| {
+                    let pool = &plan.pools[*index];
+                    format!("{}/{}", pool.provider, pool.offer_id)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            anyhow::bail!(
+                "active GitHub job matches multiple capacity pools: {identities}; make runner-label selectors disjoint"
+            );
+        }
+
+        let Some(index) = matching.first().copied() else {
+            continue;
+        };
+
+        let (queue_depth, running_jobs) = &mut counts[index];
+        match job.status.as_str() {
+            "queued" => {
+                *queue_depth = queue_depth
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow::anyhow!("queued job count overflow"))?;
+            }
+            "in_progress" => {
+                *running_jobs = running_jobs
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow::anyhow!("running job count overflow"))?;
+            }
+            _ => unreachable!("active statuses filtered above"),
+        }
+    }
+
+    Ok(counts)
 }
 
 #[derive(Debug, Deserialize)]
@@ -327,6 +480,26 @@ mod tests {
         }
     }
 
+    fn pool(
+        provider: &str,
+        offer_id: &str,
+        required_labels: &[&str],
+        parallel_slots: u32,
+    ) -> GitHubCapacityPool {
+        GitHubCapacityPool {
+            provider: provider.into(),
+            offer_id: offer_id.into(),
+            required_labels: required_labels
+                .iter()
+                .map(|label| (*label).into())
+                .collect(),
+            parallel_slots,
+            slot_turnover_ms: 12_000,
+            cache_state: CacheState::Warm,
+            cache_penalty_ms: 0,
+        }
+    }
+
     #[test]
     fn collects_matching_jobs_with_pagination_and_auth() {
         let responses = vec![
@@ -364,6 +537,77 @@ mod tests {
                 .to_ascii_lowercase()
                 .contains(&format!("x-github-api-version: {GITHUB_API_VERSION}"))
         }));
+    }
+
+    #[test]
+    fn one_scan_populates_multiple_provider_pools() {
+        let responses = vec![
+            r#"{"total_count":1,"workflow_runs":[{"id":10}]}"#,
+            r#"{"total_count":1,"workflow_runs":[{"id":11}]}"#,
+            r#"{"total_count":2,"jobs":[{"status":"queued","labels":["ubuntu-latest"]},{"status":"queued","labels":["self-hosted","depot-linux"]}]}"#,
+            r#"{"total_count":2,"jobs":[{"status":"in_progress","labels":["ubuntu-latest"]},{"status":"in_progress","labels":["self-hosted","depot-linux"]}]}"#,
+        ];
+        let (api_base, captured) = spawn_server(responses);
+        let client = GitHubCapacityClient::new(api_base);
+        let plan = GitHubCapacityPlan {
+            schema_version: 1,
+            pools: vec![
+                pool(
+                    "github-actions",
+                    "ubuntu-latest-private-x64",
+                    &["ubuntu-latest"],
+                    4,
+                ),
+                pool(
+                    "depot",
+                    "depot-ubuntu-24.04",
+                    &["self-hosted", "depot-linux"],
+                    8,
+                ),
+            ],
+        };
+
+        let snapshot = client
+            .collect_plan("secret-token", "owner/repo", &plan)
+            .expect("snapshot");
+        assert_eq!(snapshot.states.len(), 2);
+
+        let github = snapshot
+            .states
+            .iter()
+            .find(|state| state.provider == "github-actions")
+            .expect("GitHub state");
+        let depot = snapshot
+            .states
+            .iter()
+            .find(|state| state.provider == "depot")
+            .expect("Depot state");
+
+        assert_eq!((github.queue_depth, github.running_jobs), (1, 1));
+        assert_eq!((depot.queue_depth, depot.running_jobs), (1, 1));
+
+        let requests = captured
+            .recv_timeout(Duration::from_secs(2))
+            .expect("captures");
+        assert_eq!(requests.len(), 4);
+    }
+
+    #[test]
+    fn ambiguous_pool_match_fails_closed() {
+        let plan = GitHubCapacityPlan {
+            schema_version: 1,
+            pools: vec![
+                pool("pool-a", "offer-a", &["self-hosted"], 2),
+                pool("pool-b", "offer-b", &["self-hosted", "linux"], 2),
+            ],
+        };
+        let jobs = vec![WorkflowJobSummary {
+            status: "queued".into(),
+            labels: Some(vec!["self-hosted".into(), "linux".into()]),
+        }];
+
+        let error = count_active_jobs(&jobs, &plan).expect_err("ambiguous match must fail");
+        assert!(error.to_string().contains("matches multiple capacity pools"));
     }
 
     #[test]
