@@ -14,6 +14,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add Linux child-process observation with versioned JSON evidence.
 - Dogfood CIShape by observing its own GitHub Actions workloads and uploading run evidence.
 - Add provider-neutral CI identity plus idempotent JSON/JSONL history import and export.
+- Aggregate rolling main-branch CI observations into a portable historical report.
 
 ### Documentation
 
