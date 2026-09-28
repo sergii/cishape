@@ -8,10 +8,10 @@ on:
         required: true
         default: sergii/cishape
         type: string
-      min_runs:
-        description: Minimum historical runs before an advisory is actionable
+      policy:
+        description: Repository-relative optimization policy path
         required: true
-        default: "10"
+        default: policies/default-v1.json
         type: string
   workflow_run:
     workflows:
@@ -108,33 +108,33 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_REPOSITORY: ${{ inputs.repository }}
-          MANUAL_MIN_RUNS: ${{ inputs.min_runs }}
+          MANUAL_POLICY: ${{ inputs.policy }}
         run: |
           set -euo pipefail
           if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
             repository="${MANUAL_REPOSITORY}"
-            min_runs="${MANUAL_MIN_RUNS}"
+            policy="${MANUAL_POLICY}"
           else
             repository="${GITHUB_REPOSITORY}"
-            min_runs="10"
+            policy="policies/default-v1.json"
           fi
 
-          if ! [[ "${min_runs}" =~ ^[1-9][0-9]*$ ]]; then
-            echo "min_runs must be a positive integer." >&2
+          if [ ! -f "${policy}" ]; then
+            echo "Optimization policy not found: ${policy}" >&2
             exit 1
           fi
 
           echo "repository=${repository}" >> "${GITHUB_OUTPUT}"
-          echo "min_runs=${min_runs}" >> "${GITHUB_OUTPUT}"
+          echo "policy=${policy}" >> "${GITHUB_OUTPUT}"
 
       - name: Generate deterministic advisory
         run: |
           set -euo pipefail
           mkdir -p .cishape/advisory/output
 
-          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --min-runs "${{ steps.inputs.outputs.min_runs }}"             --format markdown             --output .cishape/advisory/output/advisory.md
+          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --policy "${{ steps.inputs.outputs.policy }}"             --format markdown             --output .cishape/advisory/output/advisory.md
 
-          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --min-runs "${{ steps.inputs.outputs.min_runs }}"             --format json             --output .cishape/advisory/output/advisory.json
+          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --policy "${{ steps.inputs.outputs.policy }}"             --format json             --output .cishape/advisory/output/advisory.json
 
           cat .cishape/advisory/output/advisory.md >> "${GITHUB_STEP_SUMMARY}"
 
