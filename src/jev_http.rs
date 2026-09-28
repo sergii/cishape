@@ -141,7 +141,9 @@ mod tests {
                 "{status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            stream.write_all(response.as_bytes()).expect("write response");
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
         });
 
         (format!("http://{address}/v1/systemone"), rx)
@@ -167,7 +169,9 @@ mod tests {
         let response = client.send("secret-key", &request()).expect("send");
         assert_eq!(response.model, "jev-1.13.0");
 
-        let raw = captured.recv_timeout(Duration::from_secs(2)).expect("capture");
+        let raw = captured
+            .recv_timeout(Duration::from_secs(2))
+            .expect("capture");
         assert!(raw.contains("Authorization: Bearer secret-key"));
         assert!(raw.contains("\"model\":\"jev-latest\""));
         assert!(raw.contains("\"runner_choice\""));
