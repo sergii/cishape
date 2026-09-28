@@ -1,5 +1,6 @@
 pub mod decision;
 pub mod interchange;
+pub mod jev_http;
 pub mod model;
 pub mod observe;
 pub mod optimize;

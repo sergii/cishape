@@ -95,11 +95,21 @@ cargo run -- decision-prepare \
   test
 ```
 
-The request contains only deterministic feasible runner candidates. JEV1 is offline by design: a recorded Jev response can be validated and persisted with `decision-record`, while any choice outside the feasible set fails closed. Shadow decisions have no CI execution side effects.
+The request contains only deterministic feasible runner candidates. A recorded Jev response can be validated and persisted with `decision-record`, while any choice outside the feasible set fails closed.
+
+With an explicit server-side key, the same prepared request can be sent live:
+
+```bash
+export JEV_API_KEY=...
+cargo run -- decision-run \
+  --request .cishape/decisions/test-request.json
+```
+
+The live adapter uses the official TypeSafe System One endpoint by default, stores the raw response as evidence, and then runs the same fail-closed JEV1 validation. Shadow decisions have no CI execution side effects.
 
 ## Direction
 
-The next slices can add the live TypeSafe HTTP adapter, OpenTelemetry/Parquet interchange, and richer provider/queue/cost context after shadow decisions have enough historical evidence.
+The next slices can add OpenTelemetry/Parquet interchange and richer provider/queue/cost context after shadow decisions have enough historical evidence.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 

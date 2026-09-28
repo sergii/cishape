@@ -76,7 +76,7 @@ Priorities:
 
 ## VS4 - Jev decision experiment
 
-Status: In progress with offline shadow contract.
+Status: Shadow contract complete; live transport implemented pending first credentialed proof.
 
 Keep deterministic feasibility/ranking.
 
@@ -88,7 +88,9 @@ JEV1:
 - persist DecisionRecord separately from Recommendation/RunObservation
 - compare Jev choice with the deterministic baseline in shadow mode
 
-Follow-ups add live API transport plus richer queue, price, latency-objective, and provider-reliability context after sufficient history exists.
+JEV2 adds the explicit live TypeSafe HTTP transport while preserving raw response evidence and the same fail-closed validator.
+
+Follow-ups add richer queue, price, latency-objective, provider-reliability context, and outcome evaluation after sufficient history exists.
 
 ## VS5 - Cloud ingest
 

@@ -101,8 +101,37 @@ CIShape rejects a Jev response when:
 
 Jev cannot widen the candidate set.
 
-## Network adapter later
+## Live Jev transport
 
-A future HTTP adapter may POST the generated wire request to TypeSafe's System One endpoint using a server-side API key.
+JEV2 adds an explicit network command while preserving the JEV1 contract:
 
-That adapter is intentionally outside JEV1 so the domain contract, persistence, and failure behavior can be tested without credentials or external availability.
+```bash
+export JEV_API_KEY=...
+
+cishape decision-run \
+  --request .cishape/decisions/test-request.json
+```
+
+By default CIShape sends the exact prepared wire request to:
+
+```text
+https://api.typesafe.ai/v1/systemone
+```
+
+The endpoint can be overridden for testing or a compatible gateway.
+
+The API key is read from `JEV_API_KEY` by default, can be redirected to another environment variable with `--api-key-env`, and is never persisted or printed.
+
+The live path is:
+
+```text
+prepared request
+   -> HTTPS
+   -> raw Jev response evidence
+   -> existing fail-closed validator
+   -> DecisionRecord
+```
+
+A transport error or non-success HTTP status produces no DecisionRecord. A syntactically valid response that selects an infeasible candidate is saved as provider evidence but still fails before a DecisionRecord is accepted.
+
+JEV2 remains shadow-only and has no CI execution side effects.

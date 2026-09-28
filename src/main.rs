@@ -3,6 +3,7 @@ use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_jev_response,
 };
 use cishape::interchange;
+use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation};
 use cishape::observe;
 use cishape::optimize::{default_catalog, feasible_candidates, recommend};
@@ -91,6 +92,21 @@ enum Command {
         output: Option<PathBuf>,
         job: String,
     },
+    /// Send a prepared Jev request, validate the response, and record a shadow decision.
+    DecisionRun {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long, default_value = DEFAULT_JEV_ENDPOINT)]
+        endpoint: String,
+        #[arg(long, default_value = "JEV_API_KEY")]
+        api_key_env: String,
+        #[arg(long)]
+        response_output: Option<PathBuf>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Record an offline Jev response as a shadow DecisionRecord.
     DecisionRecord {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -154,6 +170,21 @@ fn main() -> Result<()> {
             output,
             job,
         } => decision_prepare_command(&db, repository.as_deref(), &job, &model, output.as_deref()),
+        Command::DecisionRun {
+            db,
+            request,
+            endpoint,
+            api_key_env,
+            response_output,
+            output,
+        } => decision_run_command(
+            &db,
+            &request,
+            &endpoint,
+            &api_key_env,
+            response_output.as_deref(),
+            output.as_deref(),
+        ),
         Command::DecisionRecord {
             db,
             request,
@@ -370,6 +401,45 @@ fn decision_prepare_command(
     Ok(())
 }
 
+fn decision_run_command(
+    db: &Path,
+    request_path: &Path,
+    endpoint: &str,
+    api_key_env: &str,
+    response_output: Option<&Path>,
+    output: Option<&Path>,
+) -> Result<()> {
+    let bundle: JevRequestBundle = serde_json::from_slice(
+        &std::fs::read(request_path).with_context(|| format!("read {}", request_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", request_path.display()))?;
+
+    let api_key = std::env::var(api_key_env)
+        .with_context(|| format!("missing Jev API key in environment variable {api_key_env}"))?;
+    let client = JevHttpClient::new(endpoint);
+    let response = client.send(&api_key, &bundle.wire)?;
+
+    let safe_request_id = safe_file_component(&bundle.decision.request_id);
+    let response_path = response_output.map(Path::to_path_buf).unwrap_or_else(|| {
+        PathBuf::from(format!(
+            ".cishape/decisions/{safe_request_id}-jev-response.json"
+        ))
+    });
+    ensure_parent(&response_path)?;
+    std::fs::write(
+        &response_path,
+        serde_json::to_vec_pretty(&response).context("serialize Jev response")?,
+    )
+    .with_context(|| format!("write {}", response_path.display()))?;
+
+    let record = record_jev_response(&bundle, response)?;
+    persist_decision_record(db, &record, output)?;
+
+    println!("  endpoint          {}", client.endpoint());
+    println!("  response          {}", response_path.display());
+    Ok(())
+}
+
 fn decision_record_command(
     db: &Path,
     request_path: &Path,
@@ -388,28 +458,28 @@ fn decision_record_command(
     .with_context(|| format!("parse {}", response_path.display()))?;
 
     let record = record_jev_response(&bundle, response)?;
+    persist_decision_record(db, &record, output)
+}
+
+fn persist_decision_record(
+    db: &Path,
+    record: &cishape::decision::DecisionRecord,
+    output: Option<&Path>,
+) -> Result<()> {
     let store = Store::open(db)?;
-    let inserted = store.insert_decision(&record)?;
+    let inserted = store.insert_decision(record)?;
 
     let output_path = output.map(Path::to_path_buf).unwrap_or_else(|| {
-        let safe_request_id = record
-            .request_id
-            .chars()
-            .map(|character| {
-                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
-                    character
-                } else {
-                    '-'
-                }
-            })
-            .collect::<String>();
-        PathBuf::from(format!(".cishape/decisions/{safe_request_id}.json"))
+        PathBuf::from(format!(
+            ".cishape/decisions/{}.json",
+            safe_file_component(&record.request_id)
+        ))
     });
 
     ensure_parent(&output_path)?;
     std::fs::write(
         &output_path,
-        serde_json::to_vec_pretty(&record).context("serialize DecisionRecord")?,
+        serde_json::to_vec_pretty(record).context("serialize DecisionRecord")?,
     )
     .with_context(|| format!("write {}", output_path.display()))?;
 
@@ -423,6 +493,19 @@ fn decision_record_command(
     println!("  stored            {}", inserted);
     println!("  evidence          {}", output_path.display());
     Ok(())
+}
+
+fn safe_file_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect()
 }
 
 fn default_observation_path(observation: &RunObservation) -> PathBuf {
