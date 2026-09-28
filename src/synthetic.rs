@@ -1,4 +1,4 @@
-use crate::model::{GIB, MIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
+use crate::model::{CiIdentity, GIB, MIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
 
 const SYNTHETIC_EPOCH_MS: u64 = 1_700_000_000_000;
 
@@ -24,8 +24,19 @@ pub fn oversized_lint(job: &str, runs: usize) -> Vec<RunObservation> {
                 read_bytes: (18 + ((i * 7) % 18) as u64) * MIB,
                 write_bytes: (3 + ((i * 5) % 7) as u64) * MIB,
                 runner: runner.clone(),
-                provider: Some("synthetic".into()),
-                provider_runner: Some("huge-demo-runner".into()),
+                ci: CiIdentity {
+                    provider: Some("synthetic".into()),
+                    repository: None,
+                    workflow: None,
+                    run_id: Some(i.to_string()),
+                    run_attempt: Some(1),
+                    workflow_job: Some(job.to_string()),
+                    commit_sha: None,
+                    git_ref: None,
+                },
+                runner_name: Some("huge-demo-runner".into()),
+                provider: None,
+                provider_runner: None,
                 queue_ms: Some(800 + ((i * 97) % 1_700) as u64),
                 cost_usd: Some(rate_per_minute * duration_seconds / 60.0),
                 exit_code: 0,
