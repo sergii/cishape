@@ -9,10 +9,10 @@ use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation, RunnerShape};
 use cishape::observe;
-use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_markdown};
 use cishape::optimize::{
     default_catalog, feasible_candidates_with_policy, recommend, recommend_with_policy,
 };
+use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_markdown};
 use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
