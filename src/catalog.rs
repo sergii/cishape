@@ -370,6 +370,25 @@ mod tests {
     }
 
     #[test]
+    fn context_specific_offer_requires_matching_repository_visibility() {
+        let mut contextual = offer("contextual", 4, 16, 0.0, Some(60));
+        contextual.repository_visibility = Some(RepositoryVisibility::Public);
+        let target = RunnerShape::new(4_000, 8 * GIB);
+
+        assert!(contextual.fit(&target, 11_000, None).is_none());
+        assert!(
+            contextual
+                .fit(&target, 11_000, Some(&RepositoryVisibility::Private))
+                .is_none()
+        );
+        assert!(
+            contextual
+                .fit(&target, 11_000, Some(&RepositoryVisibility::Public))
+                .is_some()
+        );
+    }
+
+    #[test]
     fn fixed_server_is_not_compared_as_per_job_runner() {
         let offer = RunnerOffer {
             provider: "host".into(),
@@ -396,7 +415,7 @@ mod tests {
 
         assert!(
             offer
-                .fit(&RunnerShape::new(2_000, 4 * GIB), 10_000)
+                .fit(&RunnerShape::new(2_000, 4 * GIB), 10_000, None)
                 .is_none()
         );
     }
