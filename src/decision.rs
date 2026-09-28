@@ -15,10 +15,26 @@ pub enum DecisionMode {
     Shadow,
 }
 
+impl DecisionMode {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Shadow => "shadow",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionProvider {
     Jev,
+}
+
+impl DecisionProvider {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Jev => "jev",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
