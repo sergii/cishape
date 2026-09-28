@@ -28,7 +28,10 @@ pub struct RunnerShape {
 
 impl RunnerShape {
     pub const fn new(cpu_millis: u32, memory_bytes: u64) -> Self {
-        Self { cpu_millis, memory_bytes }
+        Self {
+            cpu_millis,
+            memory_bytes,
+        }
     }
 
     pub fn cpu_cores(&self) -> f64 {
@@ -98,13 +101,25 @@ impl RunObservation {
     }
 
     pub fn observation_id(&self) -> String {
-        let provider = self.ci.provider.as_deref().or(self.provider.as_deref()).unwrap_or("local");
+        let provider = self
+            .ci
+            .provider
+            .as_deref()
+            .or(self.provider.as_deref())
+            .unwrap_or("local");
         let repository = self.ci.repository.as_deref().unwrap_or("-");
         let workflow = self.ci.workflow.as_deref().unwrap_or("-");
         let run_id = self.ci.run_id.as_deref().unwrap_or("-");
-        let run_attempt = self.ci.run_attempt.map(|value| value.to_string()).unwrap_or_else(|| "-".into());
+        let run_attempt = self
+            .ci
+            .run_attempt
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".into());
         let workflow_job = self.ci.workflow_job.as_deref().unwrap_or("-");
-        format!("{provider}:{repository}:{workflow}:{run_id}:{run_attempt}:{workflow_job}:{}:{}", self.job, self.observed_at_unix_ms)
+        format!(
+            "{provider}:{repository}:{workflow}:{run_id}:{run_attempt}:{workflow_job}:{}:{}",
+            self.job, self.observed_at_unix_ms
+        )
     }
 
     pub fn validate_schema(&self) -> anyhow::Result<()> {
@@ -196,6 +211,9 @@ mod tests {
             cost_usd: None,
             exit_code: 0,
         };
-        assert_eq!(observation.observation_id(), "github-actions:acme/api:CI:42:1:check:test:123");
+        assert_eq!(
+            observation.observation_id(),
+            "github-actions:acme/api:CI:42:1:check:test:123"
+        );
     }
 }
