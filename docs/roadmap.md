@@ -120,7 +120,18 @@ Next: refresh adapters/API-backed catalogs where providers expose reliable machi
 
 ## VS7 - Policy and outcomes
 
-Move safety factors/evidence thresholds/objectives into explicit policy and compare recommendations with later observed outcomes.
+Status: POLICY1 implemented; OUTCOME1 remains next.
+
+POLICY1:
+
+- versioned optimization policy
+- explicit evidence threshold
+- CPU/RAM safety factors
+- latency penalty and optional p95 guard
+- deterministic objective
+- policy identity in recommendation/advisory evidence
+
+Next: compare recorded recommendations with later observed outcomes.
 
 ## VS8 - Cloud ingest
 
