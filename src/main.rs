@@ -420,13 +420,11 @@ fn decision_run_command(
     let response = client.send(&api_key, &bundle.wire)?;
 
     let safe_request_id = safe_file_component(&bundle.decision.request_id);
-    let response_path = response_output
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| {
-            PathBuf::from(format!(
-                ".cishape/decisions/{safe_request_id}-jev-response.json"
-            ))
-        });
+    let response_path = response_output.map(Path::to_path_buf).unwrap_or_else(|| {
+        PathBuf::from(format!(
+            ".cishape/decisions/{safe_request_id}-jev-response.json"
+        ))
+    });
     ensure_parent(&response_path)?;
     std::fs::write(
         &response_path,
