@@ -1,4 +1,5 @@
 pub mod advisory;
+pub mod catalog;
 pub mod decision;
 pub mod interchange;
 pub mod jev_http;
