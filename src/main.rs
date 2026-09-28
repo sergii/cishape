@@ -144,6 +144,8 @@ enum Command {
         #[arg(long)]
         repository: Option<String>,
         #[arg(long)]
+        provider: String,
+        #[arg(long)]
         offer_id: String,
         #[arg(long)]
         runner_label: String,
@@ -338,6 +340,7 @@ fn main() -> Result<()> {
         } => catalog_fit_command(&path, cpu, memory_gib, duration_ms),
         Command::CapacityGithub {
             repository,
+            provider,
             offer_id,
             runner_label,
             parallel_slots,
@@ -349,7 +352,7 @@ fn main() -> Result<()> {
             output,
         } => capacity_github_command(
             repository.as_deref(),
-            (&offer_id, &runner_label),
+            (&provider, &offer_id, &runner_label),
             (
                 parallel_slots,
                 slot_turnover_ms,
@@ -662,7 +665,7 @@ fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64)
 
 fn capacity_github_command(
     repository: Option<&str>,
-    identity: (&str, &str),
+    identity: (&str, &str, &str),
     capacity: (u32, u64, CapacityCacheArg, u64),
     token_env: &str,
     api_base: Option<&str>,
@@ -678,11 +681,12 @@ fn capacity_github_command(
         .unwrap_or_else(|| DEFAULT_GITHUB_API_BASE.into());
     let token = std::env::var(token_env)
         .with_context(|| format!("missing GitHub token in environment variable {token_env}"))?;
-    let (offer_id, runner_label) = identity;
+    let (provider, offer_id, runner_label) = identity;
     let (parallel_slots, slot_turnover_ms, cache_state, cache_penalty_ms) = capacity;
 
     let config = GitHubCapacityConfig {
         repository,
+        provider: provider.into(),
         offer_id: offer_id.into(),
         runner_label: runner_label.into(),
         parallel_slots,
@@ -704,6 +708,7 @@ fn capacity_github_command(
             path.display()
         );
         println!("  repository        {}", config.repository);
+        println!("  provider          {}", config.provider);
         println!("  runner label      {}", config.runner_label);
         println!("  queued            {}", state.queue_depth);
         println!("  running           {}", state.running_jobs);
