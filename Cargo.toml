@@ -1,0 +1,16 @@
+[package]
+name = "cishape"
+version = "0.1.0"
+edition = "2024"
+description = "Vendor-neutral CI workload profiler and runner-shape optimizer"
+repository = "https://github.com/sergii/cishape"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+duckdb = { version = "=1.10505.0", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

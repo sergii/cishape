@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  quick:
+    name: quick
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+  check:
+    name: check
+    needs: quick
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Resolve dependency graph
+        run: cargo generate-lockfile
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: cishape-ci
+          key: duckdb-1.10505.0
+          cache-on-failure: true
+
+      - name: Test
+        run: cargo test --locked --all-features
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
+
+      - name: POC0 demo
+        run: cargo run --locked --quiet -- demo
