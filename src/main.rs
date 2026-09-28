@@ -36,7 +36,7 @@ enum Command {
         db: PathBuf,
         #[arg(long)]
         output: Option<PathBuf>,
-        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        #[arg(last = true, required = true, num_args = 1..)]
         command: Vec<String>,
     },
     /// Build a historical JobShape from stored runs.
