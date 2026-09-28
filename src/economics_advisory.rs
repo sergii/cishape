@@ -1,8 +1,6 @@
 use crate::catalog::ProviderCatalog;
 use crate::economics::{CapacitySnapshot, EconomicsReport, evaluate as evaluate_economics};
-use crate::economics_policy::{
-    EconomicsPolicy, EconomicsSelection, select as select_economics,
-};
+use crate::economics_policy::{EconomicsPolicy, EconomicsSelection, select as select_economics};
 use crate::model::{JobShape, RunnerShape};
 use crate::optimize::{default_catalog, recommend_with_policy};
 use crate::policy::OptimizationPolicy;
@@ -210,18 +208,13 @@ pub fn to_markdown(report: &EconomicsAdvisoryReport) -> String {
         "- Capacity snapshot: `{}` from `{}`\n",
         report.snapshot_observed_at, report.snapshot_source
     ));
-    output.push_str(&format!(
-        "- Minimum evidence: {} runs\n",
-        report.min_runs
-    ));
+    output.push_str(&format!("- Minimum evidence: {} runs\n", report.min_runs));
     output.push_str("- Advisory only - no CI execution changes are made.\n\n");
 
     output.push_str(
         "| Repository | Job | Runs | Status | Current | Target | Predicted p95 | Selected offer | Effective cost | Time-to-green |\n",
     );
-    output.push_str(
-        "| --- | --- | ---: | --- | --- | --- | ---: | --- | ---: | ---: |\n",
-    );
+    output.push_str("| --- | --- | ---: | --- | --- | --- | ---: | --- | ---: | ---: |\n");
 
     for item in &report.items {
         let repository = item.repository.as_deref().unwrap_or("local");
@@ -288,9 +281,8 @@ mod tests {
     fn selects_provider_from_history_derived_target() {
         let catalog =
             ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("catalog");
-        let snapshot =
-            CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
-                .expect("snapshot");
+        let snapshot = CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
+            .expect("snapshot");
         let item = build_item(
             &profile(20),
             &OptimizationPolicy::default_v1(),
@@ -314,9 +306,8 @@ mod tests {
     fn insufficient_history_never_selects_provider() {
         let catalog =
             ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("catalog");
-        let snapshot =
-            CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
-                .expect("snapshot");
+        let snapshot = CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
+            .expect("snapshot");
         let item = build_item(
             &profile(5),
             &OptimizationPolicy::default_v1(),
@@ -326,10 +317,7 @@ mod tests {
         )
         .expect("advisory");
 
-        assert_eq!(
-            item.status,
-            EconomicsAdvisoryStatus::InsufficientEvidence
-        );
+        assert_eq!(item.status, EconomicsAdvisoryStatus::InsufficientEvidence);
         assert!(item.target_runner.is_none());
         assert!(item.economics.is_none());
         assert!(item.selection.is_none());
