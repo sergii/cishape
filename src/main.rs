@@ -323,6 +323,9 @@ fn print_profile(profile: &JobShape) {
 
 fn print_recommendation(recommendation: &Recommendation) {
     println!("Recommendation");
+    if let Some(repository) = &recommendation.repository {
+        println!("  repository        {repository}");
+    }
     println!("  current           {}", recommendation.current);
     println!("  recommended       {}", recommendation.recommended.shape);
     println!(
