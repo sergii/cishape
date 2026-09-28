@@ -188,10 +188,8 @@ mod tests {
         strict.cpu_safety_factor = 3.0;
         strict.memory_safety_factor = 3.0;
 
-        let relaxed_candidates =
-            feasible_candidates_with_policy(&profile, &catalog, &relaxed);
-        let strict_candidates =
-            feasible_candidates_with_policy(&profile, &catalog, &strict);
+        let relaxed_candidates = feasible_candidates_with_policy(&profile, &catalog, &relaxed);
+        let strict_candidates = feasible_candidates_with_policy(&profile, &catalog, &strict);
 
         assert_eq!(relaxed_candidates[0].name, "cpu1-mem2");
         assert_eq!(strict_candidates[0].name, "cpu4-mem8");
@@ -204,8 +202,6 @@ mod tests {
         let mut policy = OptimizationPolicy::default_v1();
         policy.max_predicted_p95_ms = Some(10_000);
 
-        assert!(
-            feasible_candidates_with_policy(&profile, &catalog, &policy).is_empty()
-        );
+        assert!(feasible_candidates_with_policy(&profile, &catalog, &policy).is_empty());
     }
 }
