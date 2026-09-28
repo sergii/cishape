@@ -68,6 +68,7 @@ pub fn recommend(profile: &JobShape, catalog: &[RunnerCandidate]) -> Option<Reco
 
     Some(Recommendation {
         job: profile.job.clone(),
+        repository: profile.repository.clone(),
         current: profile.current_runner.clone(),
         cpu_headroom: candidate.shape.cpu_millis as f64 / profile.cpu_peak_p95_millis,
         memory_headroom: candidate.shape.memory_bytes as f64 / profile.memory_peak_p99_bytes,
