@@ -61,20 +61,18 @@ pub fn evaluate(
 ) -> Result<OutcomeRecord> {
     anyhow::ensure!(min_runs > 0, "outcome min_runs must be positive");
 
-    let baseline_runner = decision
-        .baseline_runner
-        .clone()
-        .context("decision does not contain baseline_runner; regenerate it with DecisionRecord v2")?;
-    let selected_runner = decision
-        .selected_runner
-        .clone()
-        .context("decision does not contain selected_runner; regenerate it with DecisionRecord v2")?;
-    let baseline_duration_p95_ms = decision
-        .baseline_duration_p95_ms
-        .context("decision does not contain baseline_duration_p95_ms; regenerate it with DecisionRecord v2")?;
-    let predicted_p95_ms = decision
-        .predicted_p95_ms
-        .context("decision does not contain predicted_p95_ms; regenerate it with DecisionRecord v2")?;
+    let baseline_runner = decision.baseline_runner.clone().context(
+        "decision does not contain baseline_runner; regenerate it with DecisionRecord v2",
+    )?;
+    let selected_runner = decision.selected_runner.clone().context(
+        "decision does not contain selected_runner; regenerate it with DecisionRecord v2",
+    )?;
+    let baseline_duration_p95_ms = decision.baseline_duration_p95_ms.context(
+        "decision does not contain baseline_duration_p95_ms; regenerate it with DecisionRecord v2",
+    )?;
+    let predicted_p95_ms = decision.predicted_p95_ms.context(
+        "decision does not contain predicted_p95_ms; regenerate it with DecisionRecord v2",
+    )?;
 
     let matching = observations
         .iter()
@@ -305,10 +303,7 @@ mod tests {
 
     #[test]
     fn low_sample_is_insufficient_evidence() {
-        let runs = vec![
-            observation(2_000, 9_500, 0),
-            observation(3_000, 9_700, 0),
-        ];
+        let runs = vec![observation(2_000, 9_500, 0), observation(3_000, 9_700, 0)];
         let record = evaluate(&decision(), &runs, 3).expect("outcome");
         assert_eq!(record.status, OutcomeStatus::InsufficientEvidence);
     }
