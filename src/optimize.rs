@@ -1,9 +1,6 @@
 use crate::model::{GIB, JobShape, Recommendation, RunnerCandidate, RunnerShape};
+use crate::policy::{OptimizationObjective, OptimizationPolicy};
 use serde::{Deserialize, Serialize};
-
-const CPU_SAFETY_FACTOR: f64 = 1.5;
-const MEMORY_SAFETY_FACTOR: f64 = 1.5;
-const LATENCY_PENALTY: f64 = 1.05;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeasibleCandidate {
@@ -49,9 +46,28 @@ pub fn feasible_candidates(
     profile: &JobShape,
     catalog: &[RunnerCandidate],
 ) -> Vec<FeasibleCandidate> {
-    let required_cpu = profile.cpu_peak_p95_millis * CPU_SAFETY_FACTOR;
-    let required_memory = profile.memory_peak_p99_bytes * MEMORY_SAFETY_FACTOR;
-    let predicted_p95_ms = profile.duration_p95_ms * LATENCY_PENALTY;
+    feasible_candidates_with_policy(profile, catalog, &OptimizationPolicy::default_v1())
+}
+
+pub fn feasible_candidates_with_policy(
+    profile: &JobShape,
+    catalog: &[RunnerCandidate],
+    policy: &OptimizationPolicy,
+) -> Vec<FeasibleCandidate> {
+    if policy.validate().is_err() {
+        return Vec::new();
+    }
+
+    let required_cpu = profile.cpu_peak_p95_millis * policy.cpu_safety_factor;
+    let required_memory = profile.memory_peak_p99_bytes * policy.memory_safety_factor;
+    let predicted_p95_ms = profile.duration_p95_ms * policy.latency_penalty;
+
+    if policy
+        .max_predicted_p95_ms
+        .is_some_and(|limit| predicted_p95_ms > limit as f64)
+    {
+        return Vec::new();
+    }
 
     let mut candidates = catalog
         .iter()
@@ -69,20 +85,34 @@ pub fn feasible_candidates(
         })
         .collect::<Vec<_>>();
 
-    candidates.sort_by(|left, right| {
-        left.usd_per_minute
-            .partial_cmp(&right.usd_per_minute)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| left.name.cmp(&right.name))
-    });
+    match policy.objective {
+        OptimizationObjective::MinimizeCost => {
+            candidates.sort_by(|left, right| {
+                left.estimated_p95_cost_usd
+                    .partial_cmp(&right.estimated_p95_cost_usd)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| left.name.cmp(&right.name))
+            });
+        }
+    }
 
     candidates
 }
 
 pub fn recommend(profile: &JobShape, catalog: &[RunnerCandidate]) -> Option<Recommendation> {
-    let candidate = feasible_candidates(profile, catalog).into_iter().next()?;
+    recommend_with_policy(profile, catalog, &OptimizationPolicy::default_v1())
+}
 
-    let predicted_p95_ms = profile.duration_p95_ms * LATENCY_PENALTY;
+pub fn recommend_with_policy(
+    profile: &JobShape,
+    catalog: &[RunnerCandidate],
+    policy: &OptimizationPolicy,
+) -> Option<Recommendation> {
+    let candidate = feasible_candidates_with_policy(profile, catalog, policy)
+        .into_iter()
+        .next()?;
+
+    let predicted_p95_ms = profile.duration_p95_ms * policy.latency_penalty;
     let current_rate = catalog
         .iter()
         .find(|entry| entry.shape == profile.current_runner)
@@ -112,7 +142,7 @@ pub fn recommend(profile: &JobShape, catalog: &[RunnerCandidate]) -> Option<Reco
         current_estimated_cost_usd: current_cost,
         recommended_estimated_cost_usd: recommended_cost,
         cost_reduction_percent: reduction,
-        algorithm: "deterministic-fit-v0".into(),
+        algorithm: policy.algorithm_id(),
     })
 }
 
@@ -135,30 +165,47 @@ mod tests {
     }
 
     #[test]
-    fn recommends_cpu2_mem4_for_light_job() {
+    fn recommends_cpu2_mem4_for_default_policy() {
         let recommendation =
             recommend(&light_profile(), &default_catalog()).expect("recommendation");
         assert_eq!(
             recommendation.recommended.shape,
             RunnerShape::new(2_000, 4 * GIB)
         );
+        assert!(recommendation.algorithm.contains("default-v1"));
     }
 
     #[test]
-    fn feasible_candidates_are_filtered_and_cost_ordered() {
-        let candidates = feasible_candidates(&light_profile(), &default_catalog());
+    fn safety_policy_changes_feasible_set() {
+        let profile = light_profile();
+        let catalog = default_catalog();
 
-        assert_eq!(candidates[0].name, "cpu2-mem4");
-        assert_eq!(candidates[1].name, "cpu4-mem8");
+        let mut relaxed = OptimizationPolicy::default_v1();
+        relaxed.cpu_safety_factor = 1.0;
+        relaxed.memory_safety_factor = 1.0;
+
+        let mut strict = OptimizationPolicy::default_v1();
+        strict.cpu_safety_factor = 3.0;
+        strict.memory_safety_factor = 3.0;
+
+        let relaxed_candidates =
+            feasible_candidates_with_policy(&profile, &catalog, &relaxed);
+        let strict_candidates =
+            feasible_candidates_with_policy(&profile, &catalog, &strict);
+
+        assert_eq!(relaxed_candidates[0].name, "cpu1-mem2");
+        assert_eq!(strict_candidates[0].name, "cpu4-mem8");
+    }
+
+    #[test]
+    fn latency_guard_can_reject_all_candidates() {
+        let profile = light_profile();
+        let catalog = default_catalog();
+        let mut policy = OptimizationPolicy::default_v1();
+        policy.max_predicted_p95_ms = Some(10_000);
+
         assert!(
-            candidates
-                .iter()
-                .all(|candidate| candidate.cpu_headroom >= 1.5)
-        );
-        assert!(
-            candidates
-                .iter()
-                .all(|candidate| candidate.memory_headroom >= 1.5)
+            feasible_candidates_with_policy(&profile, &catalog, &policy).is_empty()
         );
     }
 }
