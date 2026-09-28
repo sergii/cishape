@@ -265,7 +265,7 @@ fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> 
                 if index > 0 {
                     println!();
                 }
-                let profile = store.profile_for(&scope.job, scope.repository.as_deref())?;
+                let profile = store.profile_scope(&scope.job, scope.repository.as_deref())?;
                 print_profile(&profile);
             }
         }
@@ -274,7 +274,7 @@ fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> 
             println!("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
 
             for scope in scopes {
-                let profile = store.profile_for(&scope.job, scope.repository.as_deref())?;
+                let profile = store.profile_scope(&scope.job, scope.repository.as_deref())?;
                 let repository = profile.repository.as_deref().unwrap_or("local");
                 println!(
                     "| {repository} | {} | {} | {:.2}s | {:.2}s | {:.2} cores | {:.0} MiB | {} |",
