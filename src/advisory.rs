@@ -45,6 +45,8 @@ pub struct AdvisoryItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryReport {
     pub schema_version: u32,
+    pub policy_id: String,
+    pub policy_schema_version: u32,
     pub min_runs: u64,
     pub items: Vec<AdvisoryItem>,
 }
@@ -109,8 +111,8 @@ pub fn to_markdown(report: &AdvisoryReport) -> String {
     let mut output = String::new();
     output.push_str("# CIShape deterministic advisory\n\n");
     output.push_str(&format!(
-        "Minimum evidence: {} runs. Advisory only - no CI execution changes are made.\n\n",
-        report.min_runs
+        "Policy: {} (schema v{}). Minimum evidence: {} runs. Advisory only - no CI execution changes are made.\n\n",
+        report.policy_id, report.policy_schema_version, report.min_runs
     ));
     output.push_str(
         "| Repository | Job | Runs | Action | Current | Target | p95 | CPU p95 | RAM p99 |\n",
