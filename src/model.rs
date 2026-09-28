@@ -183,6 +183,36 @@ mod tests {
     }
 
     #[test]
+    fn legacy_provider_fields_canonicalize_to_v2() {
+        let observation = RunObservation {
+            schema_version: 1,
+            job: "test".into(),
+            observed_at_unix_ms: 123,
+            duration_ms: 10,
+            cpu_seconds: 0.1,
+            cpu_peak_millis: 100,
+            memory_peak_bytes: MIB,
+            read_bytes: 0,
+            write_bytes: 0,
+            runner: RunnerShape::new(2_000, 4 * GIB),
+            ci: CiIdentity::default(),
+            runner_name: None,
+            provider: Some("github-actions".into()),
+            provider_runner: Some("runner-1".into()),
+            queue_ms: None,
+            cost_usd: None,
+            exit_code: 0,
+        }
+        .canonicalize();
+
+        assert_eq!(observation.schema_version, RUN_OBSERVATION_SCHEMA_VERSION);
+        assert_eq!(observation.ci.provider.as_deref(), Some("github-actions"));
+        assert_eq!(observation.runner_name.as_deref(), Some("runner-1"));
+        assert!(observation.provider.is_none());
+        assert!(observation.provider_runner.is_none());
+    }
+
+    #[test]
     fn observation_id_is_stable_for_ci_identity() {
         let observation = RunObservation {
             schema_version: RUN_OBSERVATION_SCHEMA_VERSION,
