@@ -734,8 +734,7 @@ fn catalog_fit_command(
 
     let catalog = ProviderCatalog::load(path)?;
     let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
-    let matches =
-        catalog.fit_with_visibility(&target, duration_ms, repository_visibility.clone());
+    let matches = catalog.fit_with_visibility(&target, duration_ms, repository_visibility.clone());
 
     println!(
         "Provider fits for {} at {:.2}s",
