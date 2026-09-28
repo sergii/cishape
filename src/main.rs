@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::batch::evaluate as evaluate_batch_economics;
-use cishape::catalog::ProviderCatalog;
+use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
@@ -69,6 +69,21 @@ enum OutcomeFormat {
 enum EconomicsFormat {
     Json,
     Markdown,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum RepositoryVisibilityArg {
+    Public,
+    Private,
+}
+
+impl From<RepositoryVisibilityArg> for RepositoryVisibility {
+    fn from(value: RepositoryVisibilityArg) -> Self {
+        match value {
+            RepositoryVisibilityArg::Public => Self::Public,
+            RepositoryVisibilityArg::Private => Self::Private,
+        }
+    }
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -141,6 +156,8 @@ enum Command {
         memory_gib: u64,
         #[arg(long)]
         duration_ms: u64,
+        #[arg(long, value_enum)]
+        repository_visibility: Option<RepositoryVisibilityArg>,
     },
     /// Collect a live GitHub Actions CapacitySnapshot without mutating CI.
     CapacityGithub {
@@ -372,7 +389,14 @@ fn main() -> Result<()> {
             cpu,
             memory_gib,
             duration_ms,
-        } => catalog_fit_command(&path, cpu, memory_gib, duration_ms),
+            repository_visibility,
+        } => catalog_fit_command(
+            &path,
+            cpu,
+            memory_gib,
+            duration_ms,
+            repository_visibility.map(Into::into),
+        ),
         Command::CapacityGithub {
             repository,
             provider,
@@ -675,15 +699,21 @@ fn catalog_command(path: &Path) -> Result<()> {
         catalog.schema_version, catalog.observed_at
     );
     println!();
-    println!("provider\toffer\tcapacity\texecution\tpricing");
+    println!("provider\toffer\tcapacity\texecution\trepository\tpricing");
 
     for offer in catalog.offers {
+        let repository = offer
+            .repository_visibility
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "any".into());
         println!(
-            "{}\t{}\t{}\t{:?}\t{}",
+            "{}\t{}\t{}\t{:?}\t{}\t{}",
             offer.provider,
             offer.offer_id,
             offer.capacity.display(),
             offer.execution_model,
+            repository,
             offer.pricing.display()
         );
     }
@@ -691,20 +721,30 @@ fn catalog_command(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64) -> Result<()> {
+fn catalog_fit_command(
+    path: &Path,
+    cpu: u32,
+    memory_gib: u64,
+    duration_ms: u64,
+    repository_visibility: Option<RepositoryVisibility>,
+) -> Result<()> {
     anyhow::ensure!(cpu > 0, "CPU must be positive");
     anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
     anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
 
     let catalog = ProviderCatalog::load(path)?;
     let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
-    let matches = catalog.fit(&target, duration_ms);
+    let matches =
+        catalog.fit_with_visibility(&target, duration_ms, repository_visibility.clone());
 
     println!(
         "Provider fits for {} at {:.2}s",
         target.display_id(),
         duration_ms as f64 / 1000.0
     );
+    if let Some(visibility) = repository_visibility {
+        println!("Repository visibility: {visibility}");
+    }
 
     if matches.is_empty() {
         println!("  no comparable managed offers");
