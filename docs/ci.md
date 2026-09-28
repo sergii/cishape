@@ -40,7 +40,7 @@ The entire workflow is scoped by PR number or ref:
 
 ```yaml
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: cishape-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 ```
 
