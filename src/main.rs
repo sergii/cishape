@@ -244,10 +244,7 @@ fn print_profile(profile: &JobShape) {
 fn print_recommendation(recommendation: &Recommendation) {
     println!("Recommendation");
     println!("  current           {}", recommendation.current);
-    println!(
-        "  recommended       {}",
-        recommendation.recommended.shape
-    );
+    println!("  recommended       {}", recommendation.recommended.shape);
     println!(
         "  predicted p95     {:.2}s",
         recommendation.predicted_p95_ms / 1000.0
