@@ -1,4 +1,6 @@
-use crate::economics::{EconomicsEvaluation, EconomicsReport, to_markdown as economics_to_markdown};
+use crate::economics::{
+    EconomicsEvaluation, EconomicsReport, to_markdown as economics_to_markdown,
+};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -62,7 +64,10 @@ impl EconomicsPolicy {
         );
         anyhow::ensure!(!self.policy_id.trim().is_empty(), "policy_id is required");
         if let Some(limit) = self.max_time_to_green_ms {
-            anyhow::ensure!(limit > 0, "max_time_to_green_ms must be positive when present");
+            anyhow::ensure!(
+                limit > 0,
+                "max_time_to_green_ms must be positive when present"
+            );
         }
         if let Some(limit) = self.max_effective_cost_usd {
             anyhow::ensure!(
@@ -215,7 +220,10 @@ pub fn to_markdown(report: &EconomicsDecisionReport) -> String {
     output.push_str(&format!("- Objective: `{}`\n", report.selection.objective));
 
     if let Some(limit) = report.selection.max_time_to_green_ms {
-        output.push_str(&format!("- Max time-to-green: {:.2}s\n", limit as f64 / 1000.0));
+        output.push_str(&format!(
+            "- Max time-to-green: {:.2}s\n",
+            limit as f64 / 1000.0
+        ));
     }
     if let Some(limit) = report.selection.max_effective_cost_usd {
         output.push_str(&format!("- Max effective cost: ${limit:.6}\n"));
@@ -320,6 +328,9 @@ mod tests {
             max_effective_cost_usd: Some(0.002),
         };
         let selection = select(&report, &policy).expect("selection");
-        assert_eq!(selection.selected.expect("selected").provider, "slower-cheap");
+        assert_eq!(
+            selection.selected.expect("selected").provider,
+            "slower-cheap"
+        );
     }
 }
