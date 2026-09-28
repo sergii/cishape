@@ -44,6 +44,42 @@ Outside Actions, pass `--repository owner/repo` and set the token environment va
 
 The token variable name defaults to `GITHUB_TOKEN`. The token value is never emitted.
 
+## Multi-pool observation plan
+
+CAPACITY6 can observe several runner pools in one control-plane scan and emit one comparable snapshot.
+
+The plan is versioned data:
+
+```json
+{
+  "schema_version": 1,
+  "pools": [
+    {
+      "provider": "github-actions",
+      "offer_id": "ubuntu-latest-private-x64",
+      "required_labels": ["ubuntu-latest"],
+      "parallel_slots": 4,
+      "slot_turnover_ms": 12000,
+      "cache_state": "warm",
+      "cache_penalty_ms": 0
+    }
+  ]
+}
+```
+
+Every value that describes capacity remains explicit evidence. The numbers in the repository example are illustrative, not claims about provider limits.
+
+A selector matches only when the job contains every label in `required_labels`. If an active job matches more than one configured pool, CIShape fails closed because counting it in both pools would corrupt economics evidence.
+
+```bash
+cargo run -- capacity-github-plan \
+  --config examples/github-capacity-plan-v1.json \
+  --repository owner/repo \
+  --output .cishape/capacity/live.json
+```
+
+That single output can be passed directly to `economics` or `workflow-economics`. The GitHub API traversal happens once for the observation, regardless of the number of configured pools.
+
 ## Evidence semantics
 
 The adapter paginates both workflow-run and workflow-job reads. It requests only `queued` and `in_progress` workflow runs and uses the latest execution attempt's jobs.

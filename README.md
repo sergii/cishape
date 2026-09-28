@@ -191,6 +191,17 @@ cargo run -- capacity-github \
 
 Queue depth and running-job counts come from the GitHub Actions API. The runner provider is explicit because GitHub Actions can execute GitHub-hosted, Depot, or self-hosted jobs. Concurrency capacity, turnover, and cache behavior stay explicit inputs when the control-plane API does not expose those facts for the selected pool.
 
+CAPACITY6 adds a versioned multi-pool plan so one live observation can compare several runner providers/offers:
+
+```bash
+cargo run -- capacity-github-plan \
+  --config examples/github-capacity-plan-v1.json \
+  --repository owner/repo \
+  --output .cishape/capacity/live.json
+```
+
+Pool selectors require all configured runner labels and ambiguous matches fail closed. The example plan contains illustrative capacity values that must be replaced with evidence for the actual account/pools.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
@@ -206,7 +217,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. Capacity economics, batch scheduling, workflow DAG economics, and the first live GitHub capacity adapter are deterministic and local-first. The next slices can broaden real capacity adapters and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics, batch scheduling, workflow DAG economics, and live multi-pool GitHub capacity evidence are deterministic and local-first. The next slices can broaden provider-specific evidence and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 

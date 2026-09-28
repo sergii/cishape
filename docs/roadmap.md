@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, and CAPACITY5 implemented.
+Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, and CAPACITY6 implemented.
 
 CAPACITY1:
 
@@ -198,7 +198,17 @@ CAPACITY5:
 - keep tokens out of evidence/output
 - preserve CAPACITY1-4 as provider-neutral consumers
 
-Next: broaden real capacity adapters and connect live snapshots to CI advisory evidence.
+CAPACITY6:
+
+- add a versioned multi-pool GitHubCapacityPlan
+- observe all configured pools from one active-run/job traversal
+- support all-required-label selectors per pool
+- keep provider identity independent from the GitHub control plane
+- fail closed if an active job matches multiple pools
+- emit one time-scoped CapacitySnapshot with all pool states
+- preserve the CAPACITY5 single-pool API/CLI
+
+Next: connect live capacity snapshots to economics-aware CI advisory evidence and add provider-specific discovery where reliable.
 
 ## VS9 - Cloud ingest
 

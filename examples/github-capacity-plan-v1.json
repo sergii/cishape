@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "pools": [
+    {
+      "provider": "github-actions",
+      "offer_id": "ubuntu-latest-private-x64",
+      "required_labels": ["ubuntu-latest"],
+      "parallel_slots": 4,
+      "slot_turnover_ms": 12000,
+      "cache_state": "warm",
+      "cache_penalty_ms": 0
+    },
+    {
+      "provider": "depot",
+      "offer_id": "depot-ubuntu-24.04",
+      "required_labels": ["replace-with-depot-runner-label"],
+      "parallel_slots": 8,
+      "slot_turnover_ms": 10000,
+      "cache_state": "warm",
+      "cache_penalty_ms": 0
+    }
+  ]
+}

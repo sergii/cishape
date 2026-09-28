@@ -32,6 +32,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - Runtime queue/capacity snapshots are time-scoped observations and must remain separate from static provider catalog facts.
 - Provider capacity adapters are read-only evidence collectors. They must normalize into CapacitySnapshot instead of leaking provider API types into core economics.
 - If a provider endpoint does not reliably expose concurrency capacity, turnover, cache behavior, or another required field, require explicit evidence/configuration rather than inventing a default.
+- Multi-pool capacity observation must not double-count an active job. If configured runner-label selectors overlap for an observed job, fail closed until the selectors are made unambiguous.
 - Queue wait must come from explicit concurrency/turnover inputs; do not invent provider queue behavior.
 - Cache effects must be explicit evidence. A warm cache has no penalty; a cold cache penalty must be supplied rather than guessed.
 - Keep effective cost and time-to-green as separate dimensions unless a versioned policy explicitly combines or constrains them.

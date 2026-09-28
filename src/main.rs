@@ -14,7 +14,7 @@ use cishape::economics_policy::{
     workflow_decision_to_markdown,
 };
 use cishape::github_capacity::{
-    DEFAULT_GITHUB_API_BASE, GitHubCapacityClient, GitHubCapacityConfig,
+    DEFAULT_GITHUB_API_BASE, GitHubCapacityClient, GitHubCapacityConfig, GitHubCapacityPlan,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -157,6 +157,19 @@ enum Command {
         cache_state: CapacityCacheArg,
         #[arg(long)]
         cache_penalty_ms: u64,
+        #[arg(long, default_value = "GITHUB_TOKEN")]
+        token_env: String,
+        #[arg(long)]
+        api_base: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Collect several configured GitHub Actions runner pools in one snapshot.
+    CapacityGithubPlan {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
         #[arg(long, default_value = "GITHUB_TOKEN")]
         token_env: String,
         #[arg(long)]
@@ -359,6 +372,19 @@ fn main() -> Result<()> {
                 cache_state,
                 cache_penalty_ms,
             ),
+            &token_env,
+            api_base.as_deref(),
+            output.as_deref(),
+        ),
+        Command::CapacityGithubPlan {
+            config,
+            repository,
+            token_env,
+            api_base,
+            output,
+        } => capacity_github_plan_command(
+            &config,
+            repository.as_deref(),
             &token_env,
             api_base.as_deref(),
             output.as_deref(),
@@ -713,6 +739,54 @@ fn capacity_github_command(
         println!("  queued            {}", state.queue_depth);
         println!("  running           {}", state.running_jobs);
         println!("  parallel slots    {}", state.parallel_slots);
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn capacity_github_plan_command(
+    plan_path: &Path,
+    repository: Option<&str>,
+    token_env: &str,
+    api_base: Option<&str>,
+    output: Option<&Path>,
+) -> Result<()> {
+    let repository = repository
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_REPOSITORY").ok())
+        .context("repository is required via --repository or GITHUB_REPOSITORY")?;
+    let api_base = api_base
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_API_URL").ok())
+        .unwrap_or_else(|| DEFAULT_GITHUB_API_BASE.into());
+    let token = std::env::var(token_env)
+        .with_context(|| format!("missing GitHub token in environment variable {token_env}"))?;
+    let plan = GitHubCapacityPlan::load(plan_path)?;
+    let snapshot = GitHubCapacityClient::new(api_base).collect_plan(&token, &repository, &plan)?;
+    let payload =
+        serde_json::to_string_pretty(&snapshot).context("serialize GitHub CapacitySnapshot")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!(
+            "wrote {} GitHub Actions capacity states to {}",
+            snapshot.states.len(),
+            path.display()
+        );
+        for state in &snapshot.states {
+            println!(
+                "  {}/{} queued={} running={} slots={}",
+                state.provider,
+                state.offer_id,
+                state.queue_depth,
+                state.running_jobs,
+                state.parallel_slots
+            );
+        }
     } else {
         println!("{payload}");
     }
