@@ -108,3 +108,22 @@ Policy validation rejects:
 - non-positive latency guards
 
 Policy is deterministic configuration. It cannot bypass provider trust/isolation requirements that will be modeled as separate hard constraints in later slices.
+
+
+## Provider economics policy
+
+The canonical runner optimization policy answers a different question from provider economics.
+
+`policies/default-v1.json` controls workload-shape safety:
+
+```text
+JobShape -> canonical RunnerShape
+```
+
+`policies/economics-default-v1.json` controls provider-offer selection after CAPACITY1 has produced cost and time-to-green evidence:
+
+```text
+EconomicsReport -> eligible provider offers -> deterministic selection
+```
+
+The policy classes remain separate so provider queue pressure, utilization, and billing behavior cannot leak into the canonical workload-shape model.
