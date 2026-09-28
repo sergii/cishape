@@ -102,7 +102,9 @@ fn profiles_require_repository_scope_when_job_names_overlap() {
     let mut store = Store::memory().expect("memory store");
     store.insert_runs(&[left, right]).expect("insert runs");
 
-    let error = store.profile("test").expect_err("ambiguous repository scope");
+    let error = store
+        .profile("test")
+        .expect_err("ambiguous repository scope");
     assert!(error.to_string().contains("multiple repositories"));
 
     let profile = store
@@ -111,4 +113,3 @@ fn profiles_require_repository_scope_when_job_names_overlap() {
     assert_eq!(profile.repository.as_deref(), Some("acme/api"));
     assert_eq!(profile.runs, 1);
 }
-
