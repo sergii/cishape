@@ -18,8 +18,8 @@ pub struct WorkflowDemand {
 
 impl WorkflowDemand {
     pub fn load(path: &Path) -> Result<Self> {
-        let bytes =
-            std::fs::read(path).with_context(|| format!("read workflow demand {}", path.display()))?;
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read workflow demand {}", path.display()))?;
         let demand: Self = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse workflow demand {}", path.display()))?;
         demand.validate()?;
@@ -32,8 +32,14 @@ impl WorkflowDemand {
             "unsupported workflow demand schema version {}",
             self.schema_version
         );
-        anyhow::ensure!(!self.workflow_id.trim().is_empty(), "workflow_id is required");
-        anyhow::ensure!(!self.jobs.is_empty(), "workflow must contain at least one job");
+        anyhow::ensure!(
+            !self.workflow_id.trim().is_empty(),
+            "workflow_id is required"
+        );
+        anyhow::ensure!(
+            !self.jobs.is_empty(),
+            "workflow must contain at least one job"
+        );
 
         let mut ids = BTreeSet::new();
         for job in &self.jobs {
@@ -409,9 +415,9 @@ fn topological_order(workflow: &WorkflowDemand) -> Result<Vec<usize>> {
 
     for (index, job) in workflow.jobs.iter().enumerate() {
         for dependency in &job.dependencies {
-            let dependency_index = *by_id
-                .get(dependency.as_str())
-                .ok_or_else(|| anyhow::anyhow!("job {} depends on missing job {}", job.id, dependency))?;
+            let dependency_index = *by_id.get(dependency.as_str()).ok_or_else(|| {
+                anyhow::anyhow!("job {} depends on missing job {}", job.id, dependency)
+            })?;
             dependents[dependency_index].push(index);
         }
     }
@@ -472,7 +478,9 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
         "- Snapshot: `{}` from `{}`\n\n",
         report.snapshot_observed_at, report.snapshot_source
     ));
-    output.push_str("| Provider | Offer | Slots | Critical path | Time-to-green | Total cost | Pareto |\n");
+    output.push_str(
+        "| Provider | Offer | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
+    );
     output.push_str("| --- | --- | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
@@ -484,7 +492,11 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
             evaluation.critical_path_ms as f64 / 1000.0,
             evaluation.time_to_green_ms as f64 / 1000.0,
             evaluation.effective_cost_usd,
-            if evaluation.pareto_optimal { "yes" } else { "no" }
+            if evaluation.pareto_optimal {
+                "yes"
+            } else {
+                "no"
+            }
         ));
     }
 
@@ -493,7 +505,8 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
             "\n## Schedule: {}/{}\n\n",
             evaluation.provider, evaluation.offer_id
         ));
-        output.push_str("| Job | Shape | Dependencies | Slot | Start | Finish | Runtime | Cost |\n");
+        output
+            .push_str("| Job | Shape | Dependencies | Slot | Start | Finish | Runtime | Cost |\n");
         output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |\n");
 
         for job in &evaluation.jobs {
