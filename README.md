@@ -174,6 +174,23 @@ cargo run -- workflow-economics \
 
 Each workflow job can have its own canonical RunnerShape, predicted runtime, and dependency list. CIShape validates the DAG, schedules fan-out/fan-in work against explicit provider slots and queue-ahead state, and applies EconomicsPolicy to total workflow cost and time-to-green. It remains advisory-only and does not place individual jobs across providers.
 
+CAPACITY5 adds the first live provider adapter. GitHub Actions queued/running jobs can be normalized into the same CapacitySnapshot contract:
+
+```bash
+cargo run -- capacity-github \
+  --repository owner/repo \
+  --provider github-actions \
+  --offer-id ubuntu-latest-private-x64 \
+  --runner-label ubuntu-latest \
+  --parallel-slots 20 \
+  --slot-turnover-ms 12000 \
+  --cache-state warm \
+  --cache-penalty-ms 0 \
+  --output .cishape/capacity/github-actions.json
+```
+
+Queue depth and running-job counts come from the GitHub Actions API. The runner provider is explicit because GitHub Actions can execute GitHub-hosted, Depot, or self-hosted jobs. Concurrency capacity, turnover, and cache behavior stay explicit inputs when the control-plane API does not expose those facts for the selected pool.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
@@ -189,7 +206,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. Capacity economics, batch scheduling, and workflow DAG economics are deterministic and local-first. The next slices can ingest real runtime capacity snapshots and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics, batch scheduling, workflow DAG economics, and the first live GitHub capacity adapter are deterministic and local-first. The next slices can broaden real capacity adapters and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -208,6 +225,7 @@ See:
 - [Economics policy](docs/economics-policy.md)
 - [Parallel-job batch economics](docs/batch-economics.md)
 - [Workflow DAG economics](docs/workflow-economics.md)
+- [Capacity adapters](docs/capacity-adapters.md)
 - [Optimization policy](docs/optimization-policy.md)
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)

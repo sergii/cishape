@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, CAPACITY3, and CAPACITY4 implemented.
+Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, and CAPACITY5 implemented.
 
 CAPACITY1:
 
@@ -187,7 +187,18 @@ CAPACITY4:
 - prove provider selection can flip when workflow parallelism is constrained
 - remain advisory-only with one provider offer evaluated for the whole workflow
 
-Next: ingest real runtime capacity snapshots from provider adapters.
+CAPACITY5:
+
+- add a read-only GitHub Actions REST adapter for CapacitySnapshot v1
+- enumerate queued and in-progress workflow runs and latest jobs with pagination
+- filter jobs by explicit runner label
+- observe queue_depth and running_jobs from provider state
+- keep parallel_slots, slot_turnover_ms, cache state, and cache penalty explicit when they are not reliably exposed
+- fail closed rather than silently truncate the provider's filtered run search cap
+- keep tokens out of evidence/output
+- preserve CAPACITY1-4 as provider-neutral consumers
+
+Next: broaden real capacity adapters and connect live snapshots to CI advisory evidence.
 
 ## VS9 - Cloud ingest
 
