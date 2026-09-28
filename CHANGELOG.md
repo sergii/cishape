@@ -23,6 +23,7 @@ The project follows Conventional Commits and will generate release changelogs de
 - Add deterministic Markdown/JSON advisory reports with evidence gating and rolling-history GitHub Actions dogfood.
 - Add versioned provider catalogs with pricing provenance, billing increments, incomplete-data safety, and deterministic managed-offer fitting.
 - Add versioned deterministic optimization policies for evidence thresholds, CPU/RAM safety factors, latency guardrails, and objectives.
+- Add DecisionRecord v2 and backend-free outcome evaluation against later matching CI observations.
 
 ### Documentation
 
