@@ -50,11 +50,30 @@ jobs:
           key: duckdb-1.10505.0
           cache-on-failure: true
 
+      # Build the observer once, then use that binary for the workloads below.
+      - name: Build CIShape observer
+        run: cargo build --locked --bin cishape
+
       - name: Test
-        run: cargo test --locked --all-features
+        run: |
+          target/debug/cishape observe             --job test             --output .cishape/runs/test.json             -- cargo test --locked --all-features
 
       - name: Clippy
-        run: cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
+        run: |
+          target/debug/cishape observe             --job clippy             --output .cishape/runs/clippy.json             -- cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
 
       - name: POC0 demo
-        run: cargo run --locked --quiet -- demo
+        run: |
+          target/debug/cishape observe             --job demo             --output .cishape/runs/demo.json             -- target/debug/cishape demo
+
+      - name: Upload CIShape observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cishape-observations-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .cishape/runs/*.json
+            .cishape/cishape.duckdb
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
