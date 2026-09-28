@@ -142,8 +142,8 @@ impl Store {
     }
 
     pub fn insert_decision(&self, record: &DecisionRecord) -> Result<bool> {
-        let probabilities_json =
-            serde_json::to_string(&record.probabilities).context("serialize decision probabilities")?;
+        let probabilities_json = serde_json::to_string(&record.probabilities)
+            .context("serialize decision probabilities")?;
         let record_json = serde_json::to_string(record).context("serialize DecisionRecord")?;
 
         let inserted = self.connection.execute(
