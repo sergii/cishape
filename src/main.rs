@@ -153,13 +153,7 @@ fn main() -> Result<()> {
             model,
             output,
             job,
-        } => decision_prepare_command(
-            &db,
-            repository.as_deref(),
-            &job,
-            &model,
-            output.as_deref(),
-        ),
+        } => decision_prepare_command(&db, repository.as_deref(), &job, &model, output.as_deref()),
         Command::DecisionRecord {
             db,
             request,
@@ -383,8 +377,7 @@ fn decision_record_command(
     output: Option<&Path>,
 ) -> Result<()> {
     let bundle: JevRequestBundle = serde_json::from_slice(
-        &std::fs::read(request_path)
-            .with_context(|| format!("read {}", request_path.display()))?,
+        &std::fs::read(request_path).with_context(|| format!("read {}", request_path.display()))?,
     )
     .with_context(|| format!("parse {}", request_path.display()))?;
 
