@@ -9,6 +9,8 @@ The GitHub adapter is read-only. It queries active workflow runs, fetches their 
 - `queue_depth` from matching jobs whose status is `queued`
 - `running_jobs` from matching jobs whose status is `in_progress`
 
+The GitHub API is the observation source, not necessarily the runner provider. The provider remains an explicit input so the same control plane can observe GitHub-hosted, Depot, or self-hosted runner labels without rewriting provider identity.
+
 The adapter does not infer facts that the selected GitHub REST endpoints do not expose reliably for the target capacity pool.
 
 Therefore these remain explicit inputs:
@@ -28,6 +30,7 @@ Example:
 
 ```bash
 cargo run -- capacity-github \
+  --provider github-actions \
   --offer-id ubuntu-latest-private-x64 \
   --runner-label ubuntu-latest \
   --parallel-slots 20 \
