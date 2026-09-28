@@ -173,50 +173,73 @@ impl Store {
     }
 
     pub fn profile(&self, job: &str) -> Result<JobShape> {
-        let aggregate = self.connection.query_row(
-            r#"
-            SELECT
-                count(*),
-                quantile_cont(duration_ms, 0.50),
-                quantile_cont(duration_ms, 0.95),
-                quantile_cont(cpu_peak_millis, 0.95),
-                quantile_cont(memory_peak_bytes, 0.99)
-            FROM runs
-            WHERE job = ?
-            "#,
-            params![job],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, f64>(1)?,
-                    row.get::<_, f64>(2)?,
-                    row.get::<_, f64>(3)?,
-                    row.get::<_, f64>(4)?,
-                ))
-            },
-        )?;
+        self.profile_for(job, None)
+    }
 
-        anyhow::ensure!(aggregate.0 > 0, "no observations for job {job}");
+    pub fn profile_for(&self, job: &str, repository: Option<&str>) -> Result<JobShape> {
+        let repository = self.resolve_repository_scope(job, repository)?;
 
-        let current = self.connection.query_row(
-            r#"
-            SELECT runner_cpu_millis, runner_memory_bytes
-            FROM runs
-            WHERE job = ?
-            ORDER BY observed_at_unix_ms DESC
-            LIMIT 1
-            "#,
-            params![job],
-            |row| {
-                Ok(RunnerShape::new(
-                    row.get::<_, i64>(0)? as u32,
-                    row.get::<_, i64>(1)? as u64,
-                ))
-            },
-        )?;
+        let aggregate = if let Some(repository) = repository.as_deref() {
+            self.connection.query_row(
+                r#"
+                SELECT
+                    count(*),
+                    quantile_cont(duration_ms, 0.50),
+                    quantile_cont(duration_ms, 0.95),
+                    quantile_cont(cpu_peak_millis, 0.95),
+                    quantile_cont(memory_peak_bytes, 0.99)
+                FROM runs
+                WHERE job = ? AND ci_repository = ?
+                "#,
+                params![job, repository],
+                aggregate_row,
+            )?
+        } else {
+            self.connection.query_row(
+                r#"
+                SELECT
+                    count(*),
+                    quantile_cont(duration_ms, 0.50),
+                    quantile_cont(duration_ms, 0.95),
+                    quantile_cont(cpu_peak_millis, 0.95),
+                    quantile_cont(memory_peak_bytes, 0.99)
+                FROM runs
+                WHERE job = ? AND ci_repository IS NULL
+                "#,
+                params![job],
+                aggregate_row,
+            )?
+        };
+
+        let current = if let Some(repository) = repository.as_deref() {
+            self.connection.query_row(
+                r#"
+                SELECT runner_cpu_millis, runner_memory_bytes
+                FROM runs
+                WHERE job = ? AND ci_repository = ?
+                ORDER BY observed_at_unix_ms DESC
+                LIMIT 1
+                "#,
+                params![job, repository],
+                runner_row,
+            )?
+        } else {
+            self.connection.query_row(
+                r#"
+                SELECT runner_cpu_millis, runner_memory_bytes
+                FROM runs
+                WHERE job = ? AND ci_repository IS NULL
+                ORDER BY observed_at_unix_ms DESC
+                LIMIT 1
+                "#,
+                params![job],
+                runner_row,
+            )?
+        };
 
         Ok(JobShape {
             job: job.to_string(),
+            repository,
             runs: aggregate.0 as u64,
             duration_p50_ms: aggregate.1,
             duration_p95_ms: aggregate.2,
@@ -225,4 +248,62 @@ impl Store {
             current_runner: current,
         })
     }
+
+    fn resolve_repository_scope(
+        &self,
+        job: &str,
+        requested_repository: Option<&str>,
+    ) -> Result<Option<String>> {
+        if let Some(repository) = requested_repository {
+            let count: i64 = self.connection.query_row(
+                "SELECT count(*) FROM runs WHERE job = ? AND ci_repository = ?",
+                params![job, repository],
+                |row| row.get(0),
+            )?;
+            anyhow::ensure!(
+                count > 0,
+                "no observations for job {job} in repository {repository}"
+            );
+            return Ok(Some(repository.to_string()));
+        }
+
+        let (rows, scopes, repository): (i64, i64, Option<String>) =
+            self.connection.query_row(
+                r#"
+                SELECT
+                    count(*),
+                    count(DISTINCT coalesce(ci_repository, '<local>')),
+                    max(ci_repository)
+                FROM runs
+                WHERE job = ?
+                "#,
+                params![job],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?;
+
+        anyhow::ensure!(rows > 0, "no observations for job {job}");
+        anyhow::ensure!(
+            scopes <= 1,
+            "job {job} exists in multiple repositories; pass --repository to select one"
+        );
+
+        Ok(repository)
+    }
+}
+
+fn aggregate_row(row: &duckdb::Row<'_>) -> duckdb::Result<(i64, f64, f64, f64, f64)> {
+    Ok((
+        row.get::<_, i64>(0)?,
+        row.get::<_, f64>(1)?,
+        row.get::<_, f64>(2)?,
+        row.get::<_, f64>(3)?,
+        row.get::<_, f64>(4)?,
+    ))
+}
+
+fn runner_row(row: &duckdb::Row<'_>) -> duckdb::Result<RunnerShape> {
+    Ok(RunnerShape::new(
+        row.get::<_, i64>(0)? as u32,
+        row.get::<_, i64>(1)? as u64,
+    ))
 }
