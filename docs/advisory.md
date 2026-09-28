@@ -9,7 +9,7 @@ Markdown:
 ```bash
 cishape advisory \
   --repository sergii/cishape \
-  --min-runs 10 \
+  --policy policies/default-v1.json \
   --format markdown
 ```
 
@@ -18,13 +18,13 @@ Machine-readable JSON:
 ```bash
 cishape advisory \
   --repository sergii/cishape \
-  --min-runs 10 \
+  --policy policies/default-v1.json \
   --format json
 ```
 
 ## Evidence gate
 
-A workload is not actionable until it has at least `min-runs` observations.
+A workload is not actionable until it has at least the policy's `min_runs` observations.
 
 Before that threshold the action is:
 
@@ -32,7 +32,7 @@ Before that threshold the action is:
 insufficient_evidence
 ```
 
-The default CLI threshold is 10 runs.
+The checked-in `default-v1` policy uses 10 runs. The advisory records the policy ID and schema version in both Markdown and JSON evidence.
 
 ## Actions
 
@@ -50,7 +50,7 @@ CPU and memory remain independent dimensions.
 
 ADVISORY1 intentionally does not claim provider-specific dollar savings.
 
-The current built-in catalog is a canonical shape catalog used to exercise the optimizer. Real provider aliases, prices, billing intervals, isolation classes, and queue behavior belong to the provider-catalog slice.
+The current built-in catalog is the canonical shape catalog used by the deterministic optimizer. Provider offer mapping is modeled separately in the versioned provider catalog, and outcome/capacity economics remain follow-ups.
 
 ## GitHub Actions dogfood
 
