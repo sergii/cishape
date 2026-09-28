@@ -1,4 +1,4 @@
-use crate::model::{CiIdentity, JobShape, RunObservation, RunnerShape};
+use crate::model::{CiIdentity, JobShape, RunObservation, RunnerShape, WorkloadScope};
 use anyhow::{Context, Result};
 use duckdb::{Connection, params};
 use std::path::Path;
@@ -170,6 +170,49 @@ impl Store {
 
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
+    }
+
+    pub fn workload_scopes(&self, repository: Option<&str>) -> Result<Vec<WorkloadScope>> {
+        let mut scopes = Vec::new();
+
+        if let Some(repository) = repository {
+            let mut statement = self.connection.prepare(
+                r#"
+                SELECT DISTINCT ci_repository, job
+                FROM runs
+                WHERE ci_repository = ?
+                ORDER BY job
+                "#,
+            )?;
+            let rows = statement.query_map(params![repository], |row| {
+                Ok(WorkloadScope {
+                    repository: row.get(0)?,
+                    job: row.get(1)?,
+                })
+            })?;
+            for row in rows {
+                scopes.push(row?);
+            }
+        } else {
+            let mut statement = self.connection.prepare(
+                r#"
+                SELECT DISTINCT ci_repository, job
+                FROM runs
+                ORDER BY coalesce(ci_repository, ''), job
+                "#,
+            )?;
+            let rows = statement.query_map([], |row| {
+                Ok(WorkloadScope {
+                    repository: row.get(0)?,
+                    job: row.get(1)?,
+                })
+            })?;
+            for row in rows {
+                scopes.push(row?);
+            }
+        }
+
+        Ok(scopes)
     }
 
     pub fn profile(&self, job: &str) -> Result<JobShape> {
