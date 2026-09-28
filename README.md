@@ -70,10 +70,11 @@ Observations from ephemeral runners can be merged locally without CIShape Cloud:
 ```bash
 cargo run -- import artifact-a/*.json artifact-b/*.json
 cargo run -- profile test
+cargo run -- profile --repository sergii/cishape test
 cargo run -- export --format jsonl --output history.jsonl
 ```
 
-Imports are idempotent, and portable CI identity can correlate repository, workflow, run, job, commit, and ref across artifacts.
+Imports are idempotent, and portable CI identity can correlate repository, workflow, run, job, commit, and ref across artifacts. If the same logical job name exists in multiple repositories, profiling requires an explicit `--repository` scope instead of silently mixing workloads.
 
 ## Direction
 
