@@ -150,3 +150,42 @@ fn report_summarizes_repository_workloads_as_markdown() {
     assert!(report.contains("| Repository | Job | Runs |"));
     assert!(report.contains("| sergii/cishape | test | 2 |"));
 }
+
+#[test]
+fn report_handles_legacy_local_and_repository_scopes_together() {
+    let dir = tempdir().expect("tempdir");
+    let db = dir.path().join("history.duckdb");
+
+    let mut local = observation();
+    local.ci.repository = None;
+    local.ci.run_id = None;
+    local.observed_at_unix_ms = 10;
+
+    let mut repository = observation();
+    repository.ci.repository = Some("sergii/cishape".into());
+    repository.ci.run_id = Some("11".into());
+    repository.observed_at_unix_ms = 11;
+
+    let mut store = Store::open(&db).expect("open store");
+    store
+        .insert_runs(&[local, repository])
+        .expect("insert mixed history");
+    drop(store);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cishape"))
+        .args([
+            "report",
+            "--db",
+            db.to_str().expect("db path"),
+            "--format",
+            "markdown",
+        ])
+        .output()
+        .expect("run report");
+
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("utf8 report");
+    assert!(report.contains("| local | test | 1 |"));
+    assert!(report.contains("| sergii/cishape | test | 1 |"));
+}
+
