@@ -402,10 +402,7 @@ mod tests {
         assert!(first.agrees_with_baseline);
         assert_eq!(first.confidence, 1.0);
         assert_eq!(first.request_id, second.request_id);
-        assert_eq!(
-            first.probabilities[&first.selected_candidate],
-            1.0
-        );
+        assert_eq!(first.probabilities[&first.selected_candidate], 1.0);
     }
 
     #[test]
