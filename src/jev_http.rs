@@ -120,8 +120,7 @@ mod tests {
                                 name.eq_ignore_ascii_case("transfer-encoding")
                                     && value.trim().eq_ignore_ascii_case("chunked")
                             });
-                            expected_len =
-                                content_length.map(|length| header_end + 4 + length);
+                            expected_len = content_length.map(|length| header_end + 4 + length);
                         }
 
                         if expected_len.is_some_and(|length| data.len() >= length)
