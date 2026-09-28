@@ -1,4 +1,6 @@
-use cishape::model::{CiIdentity, GIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape};
+use cishape::model::{
+    CiIdentity, GIB, RUN_OBSERVATION_SCHEMA_VERSION, RunObservation, RunnerShape,
+};
 use cishape::store::Store;
 use std::process::Command;
 use tempfile::tempdir;
