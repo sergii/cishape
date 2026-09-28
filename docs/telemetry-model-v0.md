@@ -108,7 +108,7 @@ Local runs are stored in DuckDB and can also be emitted as JSON evidence.
 
 Portable JSON/JSONL observations can be imported from multiple ephemeral CI runs into one local DuckDB. Imports are idempotent.
 
-Historical `JobShape` values are derived from multiple `RunObservation` rows. They are not stored as if they were raw measurements.
+Historical `JobShape` values are derived from multiple `RunObservation` rows. They are repository-scoped when repository identity exists, and CIShape refuses to silently merge the same logical job name across repositories. They are not stored as if they were raw measurements.
 
 DuckDB is a local analytical implementation detail; JSON/JSONL is the portable interchange boundary in PORTABLE1.
 
