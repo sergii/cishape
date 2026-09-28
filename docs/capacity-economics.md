@@ -180,3 +180,12 @@ cargo run -- economics \
 ```
 
 CAPACITY1 is read-only. It does not mutate CI workflows, schedule jobs, or call live provider APIs.
+
+
+## Parallel jobs
+
+CAPACITY3 extends this model with `cishape economics --jobs N`.
+
+For `N > 1`, CIShape keeps the per-job economics above, simulates slot availability for the batch, calculates total effective cost and the time until the last new job completes, then applies EconomicsPolicy to those batch totals.
+
+See [Parallel-job batch economics](batch-economics.md).

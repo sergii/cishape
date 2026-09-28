@@ -161,7 +161,7 @@ cargo run -- economics \
   --format markdown
 ```
 
-The evaluator models queue depth, busy/parallel slots, slot turnover, warm/cold cache state, billing granularity, and fixed-server utilization. It emits effective cost and time-to-green as separate dimensions and marks Pareto-optimal options without hiding an arbitrary weighted score. CAPACITY2 applies a versioned economics policy such as "minimize effective cost while time-to-green stays under 30 seconds" and records the deterministic provider/offer selection.
+The evaluator models queue depth, busy/parallel slots, slot turnover, warm/cold cache state, billing granularity, and fixed-server utilization. It emits effective cost and time-to-green as separate dimensions and marks Pareto-optimal options without hiding an arbitrary weighted score. CAPACITY2 applies a versioned economics policy such as "minimize effective cost while time-to-green stays under 30 seconds" and records the deterministic provider/offer selection. CAPACITY3 adds `--jobs N` so the same model can price and schedule a batch of parallel CI jobs.
 
 ## Outcomes
 
@@ -195,6 +195,7 @@ See:
 - [Provider catalogs](docs/provider-catalogs.md)
 - [Capacity economics](docs/capacity-economics.md)
 - [Economics policy](docs/economics-policy.md)
+- [Parallel-job batch economics](docs/batch-economics.md)
 - [Optimization policy](docs/optimization-policy.md)
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)

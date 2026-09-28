@@ -56,4 +56,4 @@ cargo run -- economics \
   --format markdown
 ```
 
-The result remains advisory evidence. CIShape does not mutate runner labels or schedule jobs.
+With `cishape economics --jobs N`, the same policy applies to total batch cost and the time until the last new job completes. The result remains advisory evidence. CIShape does not mutate runner labels or schedule jobs.

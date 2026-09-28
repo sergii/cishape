@@ -1,4 +1,5 @@
 pub mod advisory;
+pub mod batch;
 pub mod catalog;
 pub mod decision;
 pub mod economics;
