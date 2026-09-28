@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, and CAPACITY3 implemented.
+Status: CAPACITY1, CAPACITY2, CAPACITY3, and CAPACITY4 implemented.
 
 CAPACITY1:
 
@@ -175,7 +175,19 @@ CAPACITY3:
 - apply EconomicsPolicy constraints and selection to batch totals
 - prove parallel job count can change the selected provider offer
 
-Next: model heterogeneous workflow jobs/DAGs and ingest real runtime capacity snapshots from provider adapters.
+CAPACITY4:
+
+- accept a versioned heterogeneous WorkflowDemand DAG
+- reject missing dependencies, duplicate IDs, and cycles
+- allow each job to carry its own RunnerShape and predicted runtime
+- schedule only after dependency completion and slot availability
+- account for queue-ahead work before workflow jobs
+- emit per-job schedule/cost evidence plus intrinsic critical path and workflow time-to-green
+- apply EconomicsPolicy to total workflow cost and time-to-green
+- prove provider selection can flip when workflow parallelism is constrained
+- remain advisory-only with one provider offer evaluated for the whole workflow
+
+Next: ingest real runtime capacity snapshots from provider adapters.
 
 ## VS9 - Cloud ingest
 
