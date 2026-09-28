@@ -112,7 +112,9 @@ pub fn to_markdown(report: &AdvisoryReport) -> String {
         "Minimum evidence: {} runs. Advisory only - no CI execution changes are made.\n\n",
         report.min_runs
     ));
-    output.push_str("| Repository | Job | Runs | Action | Current | Target | p95 | CPU p95 | RAM p99 |\n");
+    output.push_str(
+        "| Repository | Job | Runs | Action | Current | Target | p95 | CPU p95 | RAM p99 |\n",
+    );
     output.push_str("| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: |\n");
 
     for item in &report.items {
