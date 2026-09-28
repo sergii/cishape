@@ -216,6 +216,10 @@ cargo run -- economics-advisory \
 
 For each workload scope, CIShape first enforces the historical evidence threshold, derives the same canonical safe target used by deterministic advisory, then evaluates current provider capacity and applies EconomicsPolicy. JSON keeps the complete economics and exclusion evidence.
 
+CAPACITY8 wires this chain into the existing `CI Advisory` GitHub Actions workflow without treating example capacity as real. Deterministic advisory still runs on every eligible advisory workflow. Economics-aware advisory activates only when a real capacity plan is explicitly supplied to a manual run or checked in at `config/cishape/github-capacity-plan.json`. Otherwise it is visibly skipped.
+
+When enabled, the workflow collects live queue/running state, writes `capacity.json`, generates Markdown plus full JSON economics evidence, appends the Markdown to the GitHub job summary, and uploads all advisory evidence together. Execution remains read-only.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
@@ -231,7 +235,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. Capacity economics, workflow scheduling, live multi-pool capacity evidence, and economics-aware advisory are deterministic and local-first. The next slice can dogfood this complete evidence chain directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics, workflow scheduling, live multi-pool capacity evidence, and economics-aware advisory are deterministic and local-first. The complete evidence chain is now wired into CI as an explicit-evidence opt-in. OpenTelemetry/Parquet interchange and broader provider discovery remain follow-ups.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
