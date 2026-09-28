@@ -179,6 +179,7 @@ CAPACITY5 adds the first live provider adapter. GitHub Actions queued/running jo
 ```bash
 cargo run -- capacity-github \
   --repository owner/repo \
+  --provider github-actions \
   --offer-id ubuntu-latest-private-x64 \
   --runner-label ubuntu-latest \
   --parallel-slots 20 \
@@ -188,7 +189,7 @@ cargo run -- capacity-github \
   --output .cishape/capacity/github-actions.json
 ```
 
-Queue depth and running-job counts come from the GitHub Actions API. Concurrency capacity, turnover, and cache behavior stay explicit inputs when GitHub does not expose those facts for the selected pool.
+Queue depth and running-job counts come from the GitHub Actions API. The runner provider is explicit because GitHub Actions can execute GitHub-hosted, Depot, or self-hosted jobs. Concurrency capacity, turnover, and cache behavior stay explicit inputs when the control-plane API does not expose those facts for the selected pool.
 
 ## Outcomes
 
