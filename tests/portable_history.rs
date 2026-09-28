@@ -86,3 +86,29 @@ fn import_is_idempotent_and_export_is_portable_jsonl() {
     assert_eq!(parsed.ci.repository.as_deref(), Some("sergii/cishape"));
     assert_eq!(parsed.job, "test");
 }
+
+#[test]
+fn profiles_require_repository_scope_when_job_names_overlap() {
+    let mut left = observation();
+    left.ci.repository = Some("acme/api".into());
+    left.ci.run_id = Some("1".into());
+    left.observed_at_unix_ms = 1;
+
+    let mut right = observation();
+    right.ci.repository = Some("acme/web".into());
+    right.ci.run_id = Some("2".into());
+    right.observed_at_unix_ms = 2;
+
+    let mut store = Store::memory().expect("memory store");
+    store.insert_runs(&[left, right]).expect("insert runs");
+
+    let error = store.profile("test").expect_err("ambiguous repository scope");
+    assert!(error.to_string().contains("multiple repositories"));
+
+    let profile = store
+        .profile_for("test", Some("acme/api"))
+        .expect("scoped profile");
+    assert_eq!(profile.repository.as_deref(), Some("acme/api"));
+    assert_eq!(profile.runs, 1);
+}
+
