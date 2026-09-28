@@ -3,7 +3,6 @@ name = "cishape"
 version = "0.1.0"
 edition = "2024"
 description = "Vendor-neutral CI workload profiler and runner-shape optimizer"
-license = "UNLICENSED"
 repository = "https://github.com/sergii/cishape"
 
 [dependencies]
