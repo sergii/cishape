@@ -172,7 +172,8 @@ mod tests {
         let raw = captured
             .recv_timeout(Duration::from_secs(2))
             .expect("capture");
-        assert!(raw.contains("Authorization: Bearer secret-key"));
+        let raw_lower = raw.to_ascii_lowercase();
+        assert!(raw_lower.contains("authorization: bearer secret-key"));
         assert!(raw.contains("\"model\":\"jev-latest\""));
         assert!(raw.contains("\"runner_choice\""));
         assert!(raw.contains("\"type\":\"choice\""));
