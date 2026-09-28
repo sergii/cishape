@@ -4,6 +4,8 @@ use std::fmt;
 pub const MIB: u64 = 1024 * 1024;
 pub const GIB: u64 = 1024 * MIB;
 
+pub const RUN_OBSERVATION_SCHEMA_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunnerShape {
     pub cpu_millis: u32,
@@ -45,7 +47,9 @@ impl fmt::Display for RunnerShape {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunObservation {
+    pub schema_version: u32,
     pub job: String,
+    pub observed_at_unix_ms: u64,
     pub duration_ms: u64,
     pub cpu_seconds: f64,
     pub cpu_peak_millis: u32,
@@ -53,12 +57,11 @@ pub struct RunObservation {
     pub read_bytes: u64,
     pub write_bytes: u64,
     pub runner: RunnerShape,
-    pub provider: String,
-    pub provider_runner: String,
-    pub queue_ms: u64,
-    pub cost_usd: f64,
+    pub provider: Option<String>,
+    pub provider_runner: Option<String>,
+    pub queue_ms: Option<u64>,
+    pub cost_usd: Option<f64>,
     pub exit_code: i32,
-    pub sequence: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

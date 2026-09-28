@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
-use cishape::model::{GIB, JobShape, Recommendation};
+use cishape::model::{GIB, JobShape, Recommendation, RunObservation};
+use cishape::observe;
 use cishape::optimize::{default_catalog, recommend};
 use cishape::store::Store;
 use cishape::synthetic;
@@ -27,6 +28,17 @@ enum Command {
         #[arg(long, default_value_t = 100)]
         runs: usize,
     },
+    /// Observe a real child process and persist one normalized run.
+    Observe {
+        #[arg(long)]
+        job: String,
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(last = true, required = true, num_args = 1..)]
+        command: Vec<String>,
+    },
     /// Build a historical JobShape from stored runs.
     Profile {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -53,6 +65,12 @@ fn main() -> Result<()> {
     match cli.command {
         Command::Demo => demo(),
         Command::Synth { db, job, runs } => synth(&db, &job, runs),
+        Command::Observe {
+            job,
+            db,
+            output,
+            command,
+        } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Profile { db, job } => {
             let store = Store::open(&db)?;
             print_profile(&store.profile(&job)?);
@@ -95,9 +113,7 @@ fn demo() -> Result<()> {
 }
 
 fn synth(path: &Path, job: &str, runs: usize) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
-    }
+    ensure_parent(path)?;
 
     let mut store = Store::open(path)?;
     let observations = synthetic::oversized_lint(job, runs);
@@ -110,9 +126,97 @@ fn synth(path: &Path, job: &str, runs: usize) -> Result<()> {
     Ok(())
 }
 
+fn observe_command(job: &str, db: &Path, output: Option<&Path>, command: &[String]) -> Result<()> {
+    let (program, args) = command
+        .split_first()
+        .ok_or_else(|| anyhow::anyhow!("observed command is required"))?;
+
+    let observation = observe::command(job, program, args)?;
+
+    let output_path = output
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| default_observation_path(&observation));
+
+    ensure_parent(&output_path)?;
+    let payload = serde_json::to_vec_pretty(&observation).context("serialize RunObservation")?;
+    std::fs::write(&output_path, payload)
+        .with_context(|| format!("write {}", output_path.display()))?;
+
+    ensure_parent(db)?;
+    let mut store = Store::open(db)?;
+    store.insert_runs(std::slice::from_ref(&observation))?;
+    drop(store);
+
+    print_observation(&observation, &output_path);
+
+    if observation.exit_code != 0 {
+        std::process::exit(observation.exit_code);
+    }
+
+    Ok(())
+}
+
+fn default_observation_path(observation: &RunObservation) -> PathBuf {
+    let job = observation
+        .job
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+
+    PathBuf::from(format!(
+        ".cishape/runs/{}-{job}.json",
+        observation.observed_at_unix_ms
+    ))
+}
+
+fn ensure_parent(path: &Path) -> Result<()> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))
+}
+
 fn recommendation_for(profile: &JobShape) -> Result<Recommendation> {
     recommend(profile, &default_catalog())
         .with_context(|| format!("no feasible runner candidate for {}", profile.job))
+}
+
+fn print_observation(observation: &RunObservation, output: &Path) {
+    println!();
+    println!("CIShape observation");
+    println!("  job               {}", observation.job);
+    println!("  runner            {}", observation.runner);
+    println!(
+        "  duration          {:.2}s",
+        observation.duration_ms as f64 / 1000.0
+    );
+    println!("  CPU total         {:.2}s", observation.cpu_seconds);
+    println!(
+        "  CPU sampled peak  {:.2} cores",
+        observation.cpu_peak_millis as f64 / 1000.0
+    );
+    println!(
+        "  memory peak       {:.0} MiB",
+        observation.memory_peak_bytes as f64 / (1024.0 * 1024.0)
+    );
+    println!(
+        "  I/O               {:.1} MiB read / {:.1} MiB written",
+        observation.read_bytes as f64 / (1024.0 * 1024.0),
+        observation.write_bytes as f64 / (1024.0 * 1024.0)
+    );
+    println!("  exit              {}", observation.exit_code);
+    println!("  evidence          {}", output.display());
 }
 
 fn print_profile(profile: &JobShape) {

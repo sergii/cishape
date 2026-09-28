@@ -43,9 +43,21 @@ cargo run -- recommend lint
 cargo run -- explain lint
 ```
 
+## Real observation
+
+OBSERVE1 adds a Linux-first wrapper mode:
+
+```bash
+cargo run -- observe --job smoke -- sh -c 'sleep 0.2'
+```
+
+CIShape runs as the parent process, observes the child process tree, writes JSON evidence, stores the normalized run in DuckDB, and preserves the child exit status.
+
+The default telemetry contract intentionally excludes source code, secrets, environment values, and stdout/stderr payload capture.
+
 ## Direction
 
-Next slices replace synthetic history with real process observation and then dogfood CIShape in this repository's own GitHub Actions.
+The next slice dogfoods real observation in this repository's own GitHub Actions.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -55,6 +67,7 @@ See:
 - [RFC-0001](docs/rfc/0001-poc-and-core-model.md)
 - [Roadmap](docs/roadmap.md)
 - [CI strategy](docs/ci.md)
+- [Telemetry model v0](docs/telemetry-model-v0.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License

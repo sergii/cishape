@@ -8,7 +8,8 @@ CIShape treats CI time and compute as product concerns.
 - fail fast on cheap deterministic checks
 - do expensive native compilation only after quick gates pass
 - reuse build artifacts aggressively
-- preserve a stable required `check` job name
+- keep one stable required `check` job
+- avoid paying runner startup/toolchain setup twice
 - keep CI reproducible enough to explain and dogfood with CIShape itself
 
 ## Pipeline
@@ -16,40 +17,36 @@ CIShape treats CI time and compute as product concerns.
 ```text
 new commit
    |
-   +--> cancel older run for the same PR/ref
-   |
-   v
-quick
-   |
-   +--> checkout
-   +--> rust toolchain
-   +--> rustfmt
+   +--> cancel older check job for the same PR/ref
    |
    v
 check
    |
+   +--> checkout
+   +--> toolchain
+   +--> rustfmt                 cheap / fail-fast
    +--> resolve dependency graph
-   +--> restore Rust/dependency build cache
-   +--> cargo test
-   +--> clippy --no-deps
-   +--> POC0 demo
+   +--> restore Rust cache
+   +--> cargo test              expensive
+   +--> clippy --no-deps        reuses build
+   +--> POC demo                reuses build
 ```
 
-The expensive `check` job never starts when the quick gate fails.
+A single job is intentional. Step failure already prevents later expensive steps, while one runner avoids duplicate checkout/toolchain startup and keeps the restored build tree hot for tests, clippy, and the demo.
 
 ## Cancellation
 
-The `quick` and `check` jobs share the same PR/ref concurrency group and use:
+The entire workflow is scoped by PR number or ref:
 
 ```yaml
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: cishape-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 ```
 
-A new commit can start its quick gate immediately. Because that quick job claims the same concurrency group as the previous expensive `check` job, it cancels stale expensive work before running. When the quick gate finishes, the new `check` job takes the same group.
+A new commit therefore supersedes the entire older workflow for the same PR/ref, including an expensive compilation that is already running.
 
-This job-level model avoids a stale workflow occupying the whole workflow-level concurrency slot while a newer commit waits behind it.
+Because CIShape now uses one validation job, workflow-level cancellation is the simplest control-plane boundary and does not duplicate runner startup.
 
 ## DuckDB
 
@@ -57,13 +54,13 @@ CIShape currently uses bundled DuckDB and pins the direct crate version exactly 
 
 The Rust cache persists Cargo registry data and dependency build artifacts, including the expensive native dependency build outputs when reusable.
 
-Changing the pinned DuckDB version intentionally invalidates the CI cache key.
+Changing the pinned DuckDB version intentionally invalidates the explicit CI cache key.
 
 ## Rust cache
 
 CI uses `Swatinem/rust-cache`, pinned to a commit SHA.
 
-The cache is shared for the CI build job and is additionally keyed by the pinned DuckDB version. Cache writes are allowed on failed jobs so an expensive successful dependency compilation is not discarded merely because a later test fails.
+The cache is shared under `cishape-ci` and is additionally keyed by the pinned DuckDB version. Cache writes are allowed on failed jobs so an expensive successful dependency compilation is not discarded merely because a later test fails.
 
 The action also keys on the Rust environment and Cargo manifests.
 
@@ -76,6 +73,18 @@ CI disables dev/test debug info because release-grade debug symbols are not usef
 CI currently generates a lockfile before the cached build and executes expensive Cargo commands with `--locked`.
 
 Before the first public binary release, `Cargo.lock` must be committed to the repository so dependency resolution is reproducible outside CI as well.
+
+## Ordering policy
+
+Checks are ordered by expected cost:
+
+1. syntax/format checks that do not compile dependencies
+2. dependency/cache preparation
+3. tests and compilation
+4. lints that can reuse prior compilation
+5. smoke/demo execution
+
+As new checks are added, put the cheapest high-signal checks first and avoid parallelism when it would duplicate a large native build merely to save a few seconds of wall time.
 
 ## Future optimizations
 
