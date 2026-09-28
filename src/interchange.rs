@@ -24,7 +24,11 @@ fn read_path(path: &Path) -> Result<Vec<RunObservation>> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("read observation file {}", path.display()))?;
     let trimmed = content.trim();
-    anyhow::ensure!(!trimmed.is_empty(), "observation file {} is empty", path.display());
+    anyhow::ensure!(
+        !trimmed.is_empty(),
+        "observation file {} is empty",
+        path.display()
+    );
 
     if let Ok(run) = serde_json::from_str::<RunObservation>(trimmed) {
         return canonicalize_all(vec![run], path);
@@ -39,9 +43,8 @@ fn read_path(path: &Path) -> Result<Vec<RunObservation>> {
         if line.trim().is_empty() {
             continue;
         }
-        let run: RunObservation = serde_json::from_str(line).with_context(|| {
-            format!("parse JSONL observation {}:{}", path.display(), index + 1)
-        })?;
+        let run: RunObservation = serde_json::from_str(line)
+            .with_context(|| format!("parse JSONL observation {}:{}", path.display(), index + 1))?;
         runs.push(run);
     }
 
