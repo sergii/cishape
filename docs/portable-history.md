@@ -18,6 +18,14 @@ cishape import artifact-a/*.json artifact-b/*.json
 
 Import is idempotent. Re-importing the same observation does not increase the historical run count.
 
+When one history database contains the same logical job name from multiple repositories, CIShape refuses an unscoped profile:
+
+```bash
+cishape profile --repository acme/api test
+```
+
+This prevents a generic name such as `test` from accidentally mixing unrelated workloads across repositories.
+
 Export the normalized local history as JSONL:
 
 ```bash
