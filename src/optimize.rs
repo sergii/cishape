@@ -89,6 +89,7 @@ mod tests {
     fn recommends_cpu2_mem4_for_light_job() {
         let profile = JobShape {
             job: "lint".into(),
+            repository: None,
             runs: 100,
             duration_p50_ms: 9_000.0,
             duration_p95_ms: 11_000.0,
