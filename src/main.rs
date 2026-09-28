@@ -248,13 +248,7 @@ fn main() -> Result<()> {
             output,
             policy,
             job,
-        } => decide_command(
-            &db,
-            repository.as_deref(),
-            &job,
-            &policy,
-            output.as_deref(),
-        ),
+        } => decide_command(&db, repository.as_deref(), &job, &policy, output.as_deref()),
         Command::DecisionPrepare {
             db,
             repository,
@@ -345,11 +339,7 @@ fn demo() -> Result<()> {
     println!();
     print_recommendation(&recommendation);
     println!();
-    print_explanation(
-        &profile,
-        &recommendation,
-        &OptimizationPolicy::default_v1(),
-    );
+    print_explanation(&profile, &recommendation, &OptimizationPolicy::default_v1());
 
     Ok(())
 }
