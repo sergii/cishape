@@ -39,9 +39,6 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Resolve dependency graph
-        run: cargo generate-lockfile
-
   check:
     name: check
     needs: quick
