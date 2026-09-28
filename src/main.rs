@@ -5,8 +5,10 @@ use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
 };
-use cishape::economics::{
-    CapacitySnapshot, evaluate as evaluate_economics, to_markdown as economics_to_markdown,
+use cishape::economics::{CapacitySnapshot, evaluate as evaluate_economics};
+use cishape::economics_policy::{
+    EconomicsDecisionReport, EconomicsPolicy, select as select_economics,
+    to_markdown as economics_decision_to_markdown,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -121,6 +123,8 @@ enum Command {
         catalog: PathBuf,
         #[arg(long)]
         snapshot: PathBuf,
+        #[arg(long, default_value = "policies/economics-default-v1.json")]
+        policy: PathBuf,
         #[arg(long)]
         cpu: u32,
         #[arg(long)]
@@ -273,6 +277,7 @@ fn main() -> Result<()> {
         Command::Economics {
             catalog,
             snapshot,
+            policy,
             cpu,
             memory_gib,
             duration_ms,
@@ -281,6 +286,7 @@ fn main() -> Result<()> {
         } => economics_command(
             &catalog,
             &snapshot,
+            &policy,
             cpu,
             memory_gib,
             duration_ms,
@@ -556,6 +562,7 @@ fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64)
 fn economics_command(
     catalog_path: &Path,
     snapshot_path: &Path,
+    policy_path: &Path,
     cpu: u32,
     memory_gib: u64,
     duration_ms: u64,
@@ -568,14 +575,20 @@ fn economics_command(
 
     let catalog = ProviderCatalog::load(catalog_path)?;
     let snapshot = CapacitySnapshot::load(snapshot_path)?;
+    let policy = EconomicsPolicy::load(policy_path)?;
     let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
-    let report = evaluate_economics(&catalog, &snapshot, &target, duration_ms)?;
+    let economics = evaluate_economics(&catalog, &snapshot, &target, duration_ms)?;
+    let selection = select_economics(&economics, &policy)?;
+    let report = EconomicsDecisionReport {
+        economics,
+        selection,
+    };
 
     let payload = match format {
         EconomicsFormat::Json => {
-            serde_json::to_string_pretty(&report).context("serialize economics report")?
+            serde_json::to_string_pretty(&report).context("serialize economics decision report")?
         }
-        EconomicsFormat::Markdown => economics_to_markdown(&report),
+        EconomicsFormat::Markdown => economics_decision_to_markdown(&report),
     };
 
     if let Some(path) = output {
