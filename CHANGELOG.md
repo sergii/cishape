@@ -11,7 +11,9 @@ The project follows Conventional Commits and will generate release changelogs de
 - Bootstrap the local-first synthetic CI workload shaping proof of concept.
 - Add explicit runner shape identities such as `CPU2-MEM4`.
 - Add DuckDB-backed historical profiling and deterministic recommendations.
+- Add Linux child-process observation with versioned JSON evidence.
+- Dogfood CIShape by observing its own GitHub Actions workloads and uploading run evidence.
 
 ### Documentation
 
-- Define architecture boundaries, roadmap, and the future HTTP boundary.
+- Define architecture boundaries, roadmap, telemetry model, CI strategy, and the future HTTP boundary.
