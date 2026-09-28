@@ -109,7 +109,7 @@ The live adapter uses the official TypeSafe System One endpoint by default, stor
 
 ## Direction
 
-The next slices can add the live TypeSafe HTTP adapter, OpenTelemetry/Parquet interchange, and richer provider/queue/cost context after shadow decisions have enough historical evidence.
+The next slices can add OpenTelemetry/Parquet interchange and richer provider/queue/cost context after shadow decisions have enough historical evidence.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
