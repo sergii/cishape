@@ -202,6 +202,20 @@ cargo run -- capacity-github-plan \
 
 Pool selectors require all configured runner labels and ambiguous matches fail closed. The example plan contains illustrative capacity values that must be replaced with evidence for the actual account/pools.
 
+CAPACITY7 connects that live evidence to historical JobShape profiles:
+
+```bash
+cargo run -- economics-advisory \
+  --db .cishape/cishape.duckdb \
+  --repository owner/repo \
+  --snapshot .cishape/capacity/live.json \
+  --optimization-policy policies/default-v1.json \
+  --economics-policy policies/economics-default-v1.json \
+  --format markdown
+```
+
+For each workload scope, CIShape first enforces the historical evidence threshold, derives the same canonical safe target used by deterministic advisory, then evaluates current provider capacity and applies EconomicsPolicy. JSON keeps the complete economics and exclusion evidence.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
@@ -217,7 +231,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. Capacity economics, batch scheduling, workflow DAG economics, and live multi-pool GitHub capacity evidence are deterministic and local-first. The next slices can broaden provider-specific evidence and surface economics-aware advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics, workflow scheduling, live multi-pool capacity evidence, and economics-aware advisory are deterministic and local-first. The next slice can dogfood this complete evidence chain directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -237,6 +251,7 @@ See:
 - [Parallel-job batch economics](docs/batch-economics.md)
 - [Workflow DAG economics](docs/workflow-economics.md)
 - [Capacity adapters](docs/capacity-adapters.md)
+- [Economics-aware advisory](docs/economics-advisory.md)
 - [Optimization policy](docs/optimization-policy.md)
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
