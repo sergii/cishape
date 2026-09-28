@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "workflow_id": "fanout-demo",
+  "jobs": [
+    {
+      "id": "prepare",
+      "target": { "cpu_millis": 1000, "memory_bytes": 2147483648 },
+      "predicted_warm_duration_ms": 2000,
+      "dependencies": []
+    },
+    {
+      "id": "branch-a",
+      "target": { "cpu_millis": 1000, "memory_bytes": 2147483648 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "branch-b",
+      "target": { "cpu_millis": 2000, "memory_bytes": 4294967296 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "branch-c",
+      "target": { "cpu_millis": 4000, "memory_bytes": 8589934592 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "branch-d",
+      "target": { "cpu_millis": 1000, "memory_bytes": 2147483648 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "branch-e",
+      "target": { "cpu_millis": 2000, "memory_bytes": 4294967296 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "branch-f",
+      "target": { "cpu_millis": 4000, "memory_bytes": 8589934592 },
+      "predicted_warm_duration_ms": 8000,
+      "dependencies": ["prepare"]
+    },
+    {
+      "id": "integrate",
+      "target": { "cpu_millis": 4000, "memory_bytes": 8589934592 },
+      "predicted_warm_duration_ms": 6000,
+      "dependencies": ["branch-a", "branch-b", "branch-c", "branch-d", "branch-e", "branch-f"]
+    },
+    {
+      "id": "e2e",
+      "target": { "cpu_millis": 2000, "memory_bytes": 4294967296 },
+      "predicted_warm_duration_ms": 4000,
+      "dependencies": ["integrate"]
+    }
+  ]
+}
