@@ -46,7 +46,7 @@ Linux-first implementation is merged.
 
 ## VS2 - Dogfood GitHub Actions
 
-Status: In progress.
+Status: Done.
 
 Run CIShape around its own:
 
@@ -59,6 +59,8 @@ Persist normalized run summaries and local DuckDB history as run-scoped workflow
 Do not require a SaaS backend.
 
 ## VS3 - Portable interchange
+
+Status: In progress.
 
 Add import/export for normalized run history.
 
