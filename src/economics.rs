@@ -234,7 +234,7 @@ pub fn evaluate(
     })
 }
 
-fn evaluate_offer(
+pub(crate) fn evaluate_offer(
     offer: &RunnerOffer,
     state: &CapacityState,
     target: &RunnerShape,
