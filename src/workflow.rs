@@ -304,7 +304,7 @@ fn schedule(
 
             let (slot_index, start_ms) = earliest_feasible_slot(&availability, dependency_ready_ms);
             let candidate = (start_ms, job.id.clone(), job_index, slot_index);
-            if best.as_ref().is_none_or(|current| candidate < *current) {
+            if best.as_ref().is_none_or(|current| &candidate < current) {
                 best = Some(candidate);
             }
         }
