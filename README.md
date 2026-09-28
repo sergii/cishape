@@ -130,9 +130,24 @@ The live adapter uses the official TypeSafe System One endpoint by default, stor
 
 For a reproducible first live proof, the repository also contains a manual-only `Jev Shadow Proof` GitHub Actions workflow. It consumes the latest rolling CIShape history artifact and requires only a repository secret named `JEV_API_KEY`.
 
+## Provider catalog
+
+CIShape keeps canonical resource recommendations separate from provider products. A dated offline catalog can map a target shape onto comparable managed offers:
+
+```bash
+cargo run -- catalog
+
+cargo run -- catalog-fit \
+  --cpu 2 \
+  --memory-gib 4 \
+  --duration-ms 11000
+```
+
+Provider records carry pricing provenance and billing semantics. Missing RAM, price, or billing increments are kept as unknown rather than fabricated, and fixed self-hosted VM economics are not mixed with ephemeral per-job pricing.
+
 ## Direction
 
-Jev is not on the critical path. The next product slices focus on deterministic advisory output, real provider catalogs/pricing, outcome evaluation, and richer queue/cost context. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. The next product slices focus on policy configuration, outcome evaluation, and richer queue/capacity economics. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -146,6 +161,7 @@ See:
 - [Portable history](docs/portable-history.md)
 - [Decision providers](docs/decision-providers.md)
 - [Deterministic advisory](docs/advisory.md)
+- [Provider catalogs](docs/provider-catalogs.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License
