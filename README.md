@@ -54,6 +54,7 @@ See:
 - [Architecture](docs/architecture.md)
 - [RFC-0001](docs/rfc/0001-poc-and-core-model.md)
 - [Roadmap](docs/roadmap.md)
+- [CI strategy](docs/ci.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License
