@@ -21,6 +21,12 @@ enum ExportFormat {
     Jsonl,
 }
 
+#[derive(Clone, Debug, ValueEnum)]
+enum ReportFormat {
+    Text,
+    Markdown,
+}
+
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Run the complete synthetic proof-of-concept without writing local state.
@@ -60,6 +66,15 @@ enum Command {
         format: ExportFormat,
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Summarize all workload profiles in local history.
+    Report {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long, value_enum, default_value = "text")]
+        format: ReportFormat,
     },
     /// Build a historical JobShape from stored runs.
     Profile {
@@ -101,6 +116,11 @@ fn main() -> Result<()> {
         } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Import { db, files } => import_command(&db, &files),
         Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
+        Command::Report {
+            db,
+            repository,
+            format,
+        } => report_command(&db, repository.as_deref(), format),
         Command::Profile {
             db,
             repository,
@@ -227,6 +247,46 @@ fn export_command(db: &Path, format: ExportFormat, output: Option<&Path>) -> Res
         (ExportFormat::Jsonl, None) => {
             let stdout = std::io::stdout();
             interchange::write_jsonl(&runs, stdout.lock())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> Result<()> {
+    let store = Store::open(db)?;
+    let scopes = store.workload_scopes(repository)?;
+
+    anyhow::ensure!(!scopes.is_empty(), "history is empty");
+
+    match format {
+        ReportFormat::Text => {
+            for (index, scope) in scopes.iter().enumerate() {
+                if index > 0 {
+                    println!();
+                }
+                let profile = store.profile_for(&scope.job, scope.repository.as_deref())?;
+                print_profile(&profile);
+            }
+        }
+        ReportFormat::Markdown => {
+            println!("| Repository | Job | Runs | p50 | p95 | CPU p95 | RAM p99 | Runner |");
+            println!("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
+
+            for scope in scopes {
+                let profile = store.profile_for(&scope.job, scope.repository.as_deref())?;
+                let repository = profile.repository.as_deref().unwrap_or("local");
+                println!(
+                    "| {repository} | {} | {} | {:.2}s | {:.2}s | {:.2} cores | {:.0} MiB | {} |",
+                    profile.job,
+                    profile.runs,
+                    profile.duration_p50_ms / 1000.0,
+                    profile.duration_p95_ms / 1000.0,
+                    profile.cpu_peak_p95_millis / 1000.0,
+                    profile.memory_peak_p99_bytes / (1024.0 * 1024.0),
+                    profile.current_runner
+                );
+            }
         }
     }
 

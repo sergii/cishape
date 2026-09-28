@@ -76,6 +76,14 @@ cargo run -- export --format jsonl --output history.jsonl
 
 Imports are idempotent, and portable CI identity can correlate repository, workflow, run, job, commit, and ref across artifacts. If the same logical job name exists in multiple repositories, profiling requires an explicit `--repository` scope instead of silently mixing workloads.
 
+A human-readable history summary is available with:
+
+```bash
+cargo run -- report --format markdown
+```
+
+The repository also dogfoods rolling history in `.github/workflows/history.yml`: it downloads non-expired main-branch observation artifacts, imports their JSON evidence, exports canonical JSONL, renders a Markdown report, and uploads the resulting history bundle. No CIShape backend is required.
+
 ## Direction
 
 The next slices extend portable interchange with OpenTelemetry/Parquet adapters and use accumulated history for richer recommendations.

@@ -60,7 +60,7 @@ Do not require a SaaS backend.
 
 ## VS3 - Portable interchange
 
-Status: In progress.
+Status: Done for JSON/JSONL rolling history. OpenTelemetry and Parquet remain follow-ups.
 
 Add import/export for normalized run history.
 
@@ -71,6 +71,8 @@ Priorities:
 - OpenTelemetry mapping
 - Parquet
 - provider metadata adapters
+- rolling GitHub Actions history from main-branch artifacts
+- repository-safe historical report
 
 ## VS4 - Jev decision experiment
 

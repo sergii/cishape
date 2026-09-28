@@ -138,6 +138,12 @@ impl RunObservation {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkloadScope {
+    pub repository: Option<String>,
+    pub job: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobShape {
     pub job: String,

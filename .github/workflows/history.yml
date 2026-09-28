@@ -1,0 +1,122 @@
+name: CI History
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cishape-history
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  aggregate:
+    name: aggregate
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+          gh --version
+
+      - name: Resolve dependency graph
+        run: cargo generate-lockfile
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: cishape-ci
+          key: duckdb-1.10505.0
+
+      - name: Build CIShape
+        run: cargo build --locked --bin cishape
+
+      - name: Download main CI observation artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p history/input
+
+          mapfile -t artifact_ids < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100"               --jq '.artifacts[]
+                | select(.expired == false)
+                | select(.name | startswith("cishape-observations-"))
+                | select(.workflow_run.head_branch == "main")
+                | .id'
+          )
+
+          if [ "${#artifact_ids[@]}" -eq 0 ]; then
+            echo "No main-branch CIShape observation artifacts found." >&2
+            exit 1
+          fi
+
+          for artifact_id in "${artifact_ids[@]}"; do
+            target="history/input/${artifact_id}"
+            mkdir -p "${target}"
+            gh api               -H "Accept: application/vnd.github+json"               "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip"               > "${target}.zip"
+            unzip -q "${target}.zip" -d "${target}"
+            rm "${target}.zip"
+          done
+
+          echo "Downloaded ${#artifact_ids[@]} observation artifacts."
+
+      - name: Aggregate portable history
+        run: |
+          set -euo pipefail
+          mapfile -d '' observation_files < <(
+            find history/input -type f -path '*/runs/*.json' -print0 | sort -z
+          )
+
+          if [ "${#observation_files[@]}" -eq 0 ]; then
+            echo "No portable RunObservation JSON files found." >&2
+            exit 1
+          fi
+
+          target/debug/cishape import             --db history/cishape.duckdb             "${observation_files[@]}"
+
+          target/debug/cishape export             --db history/cishape.duckdb             --format jsonl             --output history/history.jsonl
+
+          target/debug/cishape report             --db history/cishape.duckdb             --format markdown             > history/report.md
+
+          cat history/report.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload rolling history
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cishape-history-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            history/cishape.duckdb
+            history/history.jsonl
+            history/report.md
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
