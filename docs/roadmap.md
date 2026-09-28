@@ -107,7 +107,7 @@ Turn accumulated history into actionable, backend-free suggestions:
 
 ## VS6 - Provider catalogs
 
-Status: CATALOG1 implemented for dated offline snapshots and per-job offer fitting.
+Status: CATALOG1 and CATALOG2 implemented for dated offline snapshots, contextual offers, and per-job fitting.
 
 - provider runner aliases
 - complete or explicitly incomplete CPU/RAM capacity
@@ -115,6 +115,14 @@ Status: CATALOG1 implemented for dated offline snapshots and per-job offer fitti
 - dated price provenance
 - billing increments
 - fixed-server pricing kept separate from ephemeral per-job pricing
+
+CATALOG2:
+
+- represent repository visibility as explicit offer eligibility when capacity/commercial semantics differ
+- model GitHub `ubuntu-latest` public and private standard runners as separate offer IDs
+- keep the shared workflow runner label as an alias, not offer identity
+- require explicit visibility for `catalog-fit` to include context-specific offers
+- encode the current public standard Ubuntu shape and zero runner-usage price without changing private-runner economics
 
 Next: refresh adapters/API-backed catalogs where providers expose reliable machine/price data.
 
