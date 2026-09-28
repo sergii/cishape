@@ -6,12 +6,15 @@ use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
 };
-use cishape::economics::{CapacitySnapshot, evaluate as evaluate_economics};
+use cishape::economics::{CacheState, CapacitySnapshot, evaluate as evaluate_economics};
 use cishape::economics_policy::{
     EconomicsDecisionReport, EconomicsPolicy, WorkflowEconomicsDecisionReport,
     select as select_economics, select_batch as select_batch_economics,
     select_workflow as select_workflow_economics, to_markdown as economics_decision_to_markdown,
     workflow_decision_to_markdown,
+};
+use cishape::github_capacity::{
+    DEFAULT_GITHUB_API_BASE, GitHubCapacityClient, GitHubCapacityConfig,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -63,6 +66,21 @@ enum OutcomeFormat {
 enum EconomicsFormat {
     Json,
     Markdown,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum CapacityCacheArg {
+    Warm,
+    Cold,
+}
+
+impl From<CapacityCacheArg> for CacheState {
+    fn from(value: CapacityCacheArg) -> Self {
+        match value {
+            CapacityCacheArg::Warm => Self::Warm,
+            CapacityCacheArg::Cold => Self::Cold,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -120,6 +138,29 @@ enum Command {
         memory_gib: u64,
         #[arg(long)]
         duration_ms: u64,
+    },
+    /// Collect a live GitHub Actions CapacitySnapshot without mutating CI.
+    CapacityGithub {
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long)]
+        offer_id: String,
+        #[arg(long)]
+        runner_label: String,
+        #[arg(long)]
+        parallel_slots: u32,
+        #[arg(long)]
+        slot_turnover_ms: u64,
+        #[arg(long, value_enum)]
+        cache_state: CapacityCacheArg,
+        #[arg(long)]
+        cache_penalty_ms: u64,
+        #[arg(long, default_value = "GITHUB_TOKEN")]
+        token_env: String,
+        #[arg(long)]
+        api_base: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     /// Evaluate provider offers against a runtime queue/capacity snapshot.
     Economics {
@@ -295,6 +336,30 @@ fn main() -> Result<()> {
             memory_gib,
             duration_ms,
         } => catalog_fit_command(&path, cpu, memory_gib, duration_ms),
+        Command::CapacityGithub {
+            repository,
+            offer_id,
+            runner_label,
+            parallel_slots,
+            slot_turnover_ms,
+            cache_state,
+            cache_penalty_ms,
+            token_env,
+            api_base,
+            output,
+        } => capacity_github_command(
+            repository.as_deref(),
+            (&offer_id, &runner_label),
+            (
+                parallel_slots,
+                slot_turnover_ms,
+                cache_state,
+                cache_penalty_ms,
+            ),
+            &token_env,
+            api_base.as_deref(),
+            output.as_deref(),
+        ),
         Command::Economics {
             catalog,
             snapshot,
@@ -590,6 +655,58 @@ fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64)
             offer.billed_seconds,
             offer.estimated_cost_usd
         );
+    }
+
+    Ok(())
+}
+
+fn capacity_github_command(
+    repository: Option<&str>,
+    identity: (&str, &str),
+    capacity: (u32, u64, CapacityCacheArg, u64),
+    token_env: &str,
+    api_base: Option<&str>,
+    output: Option<&Path>,
+) -> Result<()> {
+    let repository = repository
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_REPOSITORY").ok())
+        .context("repository is required via --repository or GITHUB_REPOSITORY")?;
+    let api_base = api_base
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_API_URL").ok())
+        .unwrap_or_else(|| DEFAULT_GITHUB_API_BASE.into());
+    let token = std::env::var(token_env)
+        .with_context(|| format!("missing GitHub token in environment variable {token_env}"))?;
+    let (offer_id, runner_label) = identity;
+    let (parallel_slots, slot_turnover_ms, cache_state, cache_penalty_ms) = capacity;
+
+    let config = GitHubCapacityConfig {
+        repository,
+        offer_id: offer_id.into(),
+        runner_label: runner_label.into(),
+        parallel_slots,
+        slot_turnover_ms,
+        cache_state: cache_state.into(),
+        cache_penalty_ms,
+    };
+    let snapshot = GitHubCapacityClient::new(api_base).collect(&token, &config)?;
+    let payload =
+        serde_json::to_string_pretty(&snapshot).context("serialize GitHub CapacitySnapshot")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        let state = snapshot.states.first().expect("adapter emits one state");
+        println!("wrote GitHub Actions capacity snapshot to {}", path.display());
+        println!("  repository        {}", config.repository);
+        println!("  runner label      {}", config.runner_label);
+        println!("  queued            {}", state.queue_depth);
+        println!("  running           {}", state.running_jobs);
+        println!("  parallel slots    {}", state.parallel_slots);
+    } else {
+        println!("{payload}");
     }
 
     Ok(())
