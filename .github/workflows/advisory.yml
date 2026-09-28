@@ -13,6 +13,21 @@ on:
         required: true
         default: policies/default-v1.json
         type: string
+      capacity_plan:
+        description: Optional repository-relative GitHub capacity plan path
+        required: false
+        default: ""
+        type: string
+      economics_policy:
+        description: Repository-relative economics policy path
+        required: true
+        default: policies/economics-default-v1.json
+        type: string
+      provider_catalog:
+        description: Repository-relative provider catalog path
+        required: true
+        default: catalogs/providers-v1.json
+        type: string
   workflow_run:
     workflows:
       - CI History
@@ -76,7 +91,8 @@ jobs:
           mkdir -p .cishape/advisory/history
 
           artifact_id="$(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100"               --jq '[.artifacts[]
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              --jq '[.artifacts[]
                 | select(.expired == false)
                 | select(.name | startswith("cishape-history-"))]
                 | sort_by(.created_at)
@@ -89,7 +105,10 @@ jobs:
             exit 1
           fi
 
-          gh api             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip"             > .cishape/advisory/history/history.zip
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+            > .cishape/advisory/history/history.zip
 
           unzip -q .cishape/advisory/history/history.zip -d .cishape/advisory/history/unpacked
           rm .cishape/advisory/history/history.zip
@@ -109,42 +128,153 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_REPOSITORY: ${{ inputs.repository }}
           MANUAL_POLICY: ${{ inputs.policy }}
+          MANUAL_CAPACITY_PLAN: ${{ inputs.capacity_plan }}
+          MANUAL_ECONOMICS_POLICY: ${{ inputs.economics_policy }}
+          MANUAL_PROVIDER_CATALOG: ${{ inputs.provider_catalog }}
         run: |
           set -euo pipefail
+
+          conventional_plan="config/cishape/github-capacity-plan.json"
+
           if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
             repository="${MANUAL_REPOSITORY}"
             policy="${MANUAL_POLICY}"
+            capacity_plan="${MANUAL_CAPACITY_PLAN}"
+            economics_policy="${MANUAL_ECONOMICS_POLICY}"
+            provider_catalog="${MANUAL_PROVIDER_CATALOG}"
+            explicit_plan="false"
+            if [ -n "${capacity_plan}" ]; then
+              explicit_plan="true"
+            fi
           else
             repository="${GITHUB_REPOSITORY}"
             policy="policies/default-v1.json"
+            economics_policy="policies/economics-default-v1.json"
+            provider_catalog="catalogs/providers-v1.json"
+            capacity_plan=""
+            explicit_plan="false"
+            if [ -f "${conventional_plan}" ]; then
+              capacity_plan="${conventional_plan}"
+            fi
           fi
 
           if [ ! -f "${policy}" ]; then
             echo "Optimization policy not found: ${policy}" >&2
             exit 1
           fi
+          if [ ! -f "${economics_policy}" ]; then
+            echo "Economics policy not found: ${economics_policy}" >&2
+            exit 1
+          fi
+          if [ ! -f "${provider_catalog}" ]; then
+            echo "Provider catalog not found: ${provider_catalog}" >&2
+            exit 1
+          fi
+
+          economics_enabled="false"
+          if [ -n "${capacity_plan}" ]; then
+            if [ ! -f "${capacity_plan}" ]; then
+              if [ "${explicit_plan}" = "true" ]; then
+                echo "Explicit capacity plan not found: ${capacity_plan}" >&2
+                exit 1
+              fi
+              capacity_plan=""
+            else
+              economics_enabled="true"
+            fi
+          fi
 
           echo "repository=${repository}" >> "${GITHUB_OUTPUT}"
           echo "policy=${policy}" >> "${GITHUB_OUTPUT}"
+          echo "capacity_plan=${capacity_plan}" >> "${GITHUB_OUTPUT}"
+          echo "economics_policy=${economics_policy}" >> "${GITHUB_OUTPUT}"
+          echo "provider_catalog=${provider_catalog}" >> "${GITHUB_OUTPUT}"
+          echo "economics_enabled=${economics_enabled}" >> "${GITHUB_OUTPUT}"
 
       - name: Generate deterministic advisory
         run: |
           set -euo pipefail
           mkdir -p .cishape/advisory/output
 
-          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --policy "${{ steps.inputs.outputs.policy }}"             --format markdown             --output .cishape/advisory/output/advisory.md
+          target/debug/cishape advisory \
+            --db "${{ steps.history.outputs.db_path }}" \
+            --repository "${{ steps.inputs.outputs.repository }}" \
+            --policy "${{ steps.inputs.outputs.policy }}" \
+            --format markdown \
+            --output .cishape/advisory/output/advisory.md
 
-          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --policy "${{ steps.inputs.outputs.policy }}"             --format json             --output .cishape/advisory/output/advisory.json
+          target/debug/cishape advisory \
+            --db "${{ steps.history.outputs.db_path }}" \
+            --repository "${{ steps.inputs.outputs.repository }}" \
+            --policy "${{ steps.inputs.outputs.policy }}" \
+            --format json \
+            --output .cishape/advisory/output/advisory.json
 
           cat .cishape/advisory/output/advisory.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Collect live capacity snapshot
+        if: steps.inputs.outputs.economics_enabled == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cishape/advisory/output
+
+          target/debug/cishape capacity-github-plan \
+            --config "${{ steps.inputs.outputs.capacity_plan }}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --output .cishape/advisory/output/capacity.json
+
+      - name: Generate economics-aware advisory
+        if: steps.inputs.outputs.economics_enabled == 'true'
+        run: |
+          set -euo pipefail
+
+          target/debug/cishape economics-advisory \
+            --db "${{ steps.history.outputs.db_path }}" \
+            --repository "${{ steps.inputs.outputs.repository }}" \
+            --catalog "${{ steps.inputs.outputs.provider_catalog }}" \
+            --snapshot .cishape/advisory/output/capacity.json \
+            --optimization-policy "${{ steps.inputs.outputs.policy }}" \
+            --economics-policy "${{ steps.inputs.outputs.economics_policy }}" \
+            --format markdown \
+            --output .cishape/advisory/output/economics-advisory.md
+
+          target/debug/cishape economics-advisory \
+            --db "${{ steps.history.outputs.db_path }}" \
+            --repository "${{ steps.inputs.outputs.repository }}" \
+            --catalog "${{ steps.inputs.outputs.provider_catalog }}" \
+            --snapshot .cishape/advisory/output/capacity.json \
+            --optimization-policy "${{ steps.inputs.outputs.policy }}" \
+            --economics-policy "${{ steps.inputs.outputs.economics_policy }}" \
+            --format json \
+            --output .cishape/advisory/output/economics-advisory.json
+
+          {
+            echo
+            echo "---"
+            echo
+            cat .cishape/advisory/output/economics-advisory.md
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Note economics advisory state
+        if: steps.inputs.outputs.economics_enabled != 'true'
+        run: |
+          {
+            echo
+            echo "---"
+            echo
+            echo "## CIShape economics-aware advisory"
+            echo
+            echo "Skipped: no explicit capacity plan is configured. No synthetic capacity facts were substituted."
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload advisory evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cishape-advisory-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            .cishape/advisory/output/advisory.md
-            .cishape/advisory/output/advisory.json
+            .cishape/advisory/output/
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 30
