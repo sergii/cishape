@@ -39,13 +39,17 @@ The expensive `check` job never starts when the quick gate fails.
 
 ## Cancellation
 
-Workflow concurrency is scoped to the workflow plus PR number or ref and uses:
+The `quick` and `check` jobs share the same PR/ref concurrency group and use:
 
 ```yaml
-cancel-in-progress: true
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 ```
 
-Every new commit therefore supersedes an older run for the same PR/ref.
+A new commit can start its quick gate immediately. Because that quick job claims the same concurrency group as the previous expensive `check` job, it cancels stale expensive work before running. When the quick gate finishes, the new `check` job takes the same group.
+
+This job-level model avoids a stale workflow occupying the whole workflow-level concurrency slot while a newer commit waits behind it.
 
 ## DuckDB
 
