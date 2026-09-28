@@ -4,6 +4,8 @@ CIShape advances through narrow vertical slices.
 
 ## VS0 - Synthetic proof
 
+Status: Done.
+
 Goal:
 
 ```text
@@ -22,6 +24,8 @@ Deliverables:
 
 ## VS1 - Real local observation
 
+Status: Done.
+
 Goal:
 
 ```text
@@ -38,9 +42,11 @@ Collect:
 - exit status
 - host/limit RunnerShape
 
-Start Linux-first.
+Linux-first implementation is merged.
 
 ## VS2 - Dogfood GitHub Actions
+
+Status: In progress.
 
 Run CIShape around its own:
 
@@ -48,7 +54,7 @@ Run CIShape around its own:
 - clippy
 - build/demo
 
-Persist run summaries as workflow artifacts first.
+Persist normalized run summaries and local DuckDB history as run-scoped workflow artifacts first.
 
 Do not require a SaaS backend.
 
@@ -59,6 +65,7 @@ Add import/export for normalized run history.
 Priorities:
 
 - JSON/JSONL
+- merge history from multiple workflow runs
 - OpenTelemetry mapping
 - Parquet
 - provider metadata adapters

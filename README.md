@@ -55,9 +55,17 @@ CIShape runs as the parent process, observes the child process tree, writes JSON
 
 The default telemetry contract intentionally excludes source code, secrets, environment values, and stdout/stderr payload capture.
 
+## Dogfooding
+
+CIShape's own GitHub Actions workflow is its first real CI workload.
+
+After the observer binary is built, CI runs its tests, Clippy, and demo through `cishape observe`. Each workflow run uploads normalized JSON observations plus the local DuckDB history as a short-lived GitHub Actions artifact.
+
+This keeps the first real dataset completely OSS and backend-free.
+
 ## Direction
 
-The next slice dogfoods real observation in this repository's own GitHub Actions.
+The next slice makes observations portable across workflow runs and providers so multiple artifacts can become one historical dataset.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
