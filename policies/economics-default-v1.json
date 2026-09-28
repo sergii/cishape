@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "policy_id": "economics-default-v1",
+  "objective": "minimize_effective_cost",
+  "max_time_to_green_ms": 30000,
+  "max_effective_cost_usd": null
+}

@@ -123,7 +123,7 @@ and marks the Pareto frontier.
 
 An offer is dominated only when another offer is no worse on both dimensions and strictly better on at least one.
 
-A later versioned policy can add constraints such as:
+CAPACITY2 adds that versioned policy explicitly. It can apply constraints such as:
 
 ```text
 time_to_green <= 45s
@@ -139,6 +139,20 @@ then minimize time_to_green
 
 without changing the underlying evidence model.
 
+The default policy is `policies/economics-default-v1.json`:
+
+```json
+{
+  "schema_version": 1,
+  "policy_id": "economics-default-v1",
+  "objective": "minimize_effective_cost",
+  "max_time_to_green_ms": 30000,
+  "max_effective_cost_usd": null
+}
+```
+
+Selection remains advisory. It records which provider offer is eligible and selected under the supplied economics evidence and policy, but does not mutate the CI scheduler.
+
 ## CLI
 
 Run the deterministic demo snapshot:
@@ -146,6 +160,7 @@ Run the deterministic demo snapshot:
 ```bash
 cargo run -- economics \
   --snapshot examples/capacity-snapshot-v1.json \
+  --policy policies/economics-default-v1.json \
   --cpu 2 \
   --memory-gib 4 \
   --duration-ms 11000 \
@@ -157,6 +172,7 @@ JSON is also available:
 ```bash
 cargo run -- economics \
   --snapshot examples/capacity-snapshot-v1.json \
+  --policy policies/economics-default-v1.json \
   --cpu 2 \
   --memory-gib 4 \
   --duration-ms 11000 \

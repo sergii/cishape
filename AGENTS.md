@@ -33,6 +33,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - Queue wait must come from explicit concurrency/turnover inputs; do not invent provider queue behavior.
 - Cache effects must be explicit evidence. A warm cache has no penalty; a cold cache penalty must be supplied rather than guessed.
 - Keep effective cost and time-to-green as separate dimensions unless a versioned policy explicitly combines or constrains them.
+- Economics selection policy must be versioned data with explicit hard constraints and deterministic tie-breaking; do not hide provider preference in code.
 - Outcome evaluation is observational. Never claim a runner caused a failure or latency change from temporal correlation alone.
 - OpenTelemetry CI/CD semantics should be reused where they fit instead of inventing equivalent vocabulary.
 - The local-first path must remain useful without signup or a network service.
