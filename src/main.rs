@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
+use cishape::batch::evaluate as evaluate_batch_economics;
 use cishape::catalog::ProviderCatalog;
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
@@ -8,7 +9,7 @@ use cishape::decision::{
 use cishape::economics::{CapacitySnapshot, evaluate as evaluate_economics};
 use cishape::economics_policy::{
     EconomicsDecisionReport, EconomicsPolicy, select as select_economics,
-    to_markdown as economics_decision_to_markdown,
+    select_batch as select_batch_economics, to_markdown as economics_decision_to_markdown,
 };
 use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
@@ -131,6 +132,8 @@ enum Command {
         memory_gib: u64,
         #[arg(long)]
         duration_ms: u64,
+        #[arg(long, default_value_t = 1)]
+        jobs: u32,
         #[arg(long, value_enum, default_value = "markdown")]
         format: EconomicsFormat,
         #[arg(long)]
@@ -281,13 +284,14 @@ fn main() -> Result<()> {
             cpu,
             memory_gib,
             duration_ms,
+            jobs,
             format,
             output,
         } => economics_command(
             &catalog,
             &snapshot,
             &policy,
-            (cpu, memory_gib),
+            (cpu, memory_gib, jobs),
             duration_ms,
             format,
             output.as_deref(),
@@ -562,14 +566,15 @@ fn economics_command(
     catalog_path: &Path,
     snapshot_path: &Path,
     policy_path: &Path,
-    target_capacity: (u32, u64),
+    workload: (u32, u64, u32),
     duration_ms: u64,
     format: EconomicsFormat,
     output: Option<&Path>,
 ) -> Result<()> {
-    let (cpu, memory_gib) = target_capacity;
+    let (cpu, memory_gib, jobs) = workload;
     anyhow::ensure!(cpu > 0, "CPU must be positive");
     anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
+    anyhow::ensure!(jobs > 0, "jobs must be positive");
     anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
 
     let catalog = ProviderCatalog::load(catalog_path)?;
@@ -577,9 +582,16 @@ fn economics_command(
     let policy = EconomicsPolicy::load(policy_path)?;
     let target = RunnerShape::new(cpu * 1000, memory_gib * GIB);
     let economics = evaluate_economics(&catalog, &snapshot, &target, duration_ms)?;
-    let selection = select_economics(&economics, &policy)?;
+    let (batch, selection) = if jobs == 1 {
+        (None, select_economics(&economics, &policy)?)
+    } else {
+        let batch = evaluate_batch_economics(&economics, &snapshot, jobs)?;
+        let selection = select_batch_economics(&batch, &policy)?;
+        (Some(batch), selection)
+    };
     let report = EconomicsDecisionReport {
         economics,
+        batch,
         selection,
     };
 
