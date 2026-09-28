@@ -699,7 +699,10 @@ fn capacity_github_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         let state = snapshot.states.first().expect("adapter emits one state");
-        println!("wrote GitHub Actions capacity snapshot to {}", path.display());
+        println!(
+            "wrote GitHub Actions capacity snapshot to {}",
+            path.display()
+        );
         println!("  repository        {}", config.repository);
         println!("  runner label      {}", config.runner_label);
         println!("  queued            {}", state.queue_depth);
