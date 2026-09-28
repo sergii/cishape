@@ -17,8 +17,8 @@ pub struct CapacitySnapshot {
 
 impl CapacitySnapshot {
     pub fn load(path: &Path) -> Result<Self> {
-        let bytes =
-            std::fs::read(path).with_context(|| format!("read capacity snapshot {}", path.display()))?;
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read capacity snapshot {}", path.display()))?;
         let snapshot: Self = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse capacity snapshot {}", path.display()))?;
         snapshot.validate()?;
@@ -343,10 +343,10 @@ fn mark_pareto_frontier(evaluations: &mut [EconomicsEvaluation]) {
                 return false;
             }
 
-            let no_worse =
-                other.effective_cost_usd <= candidate_cost && other.time_to_green_ms <= candidate_time;
-            let strictly_better =
-                other.effective_cost_usd < candidate_cost || other.time_to_green_ms < candidate_time;
+            let no_worse = other.effective_cost_usd <= candidate_cost
+                && other.time_to_green_ms <= candidate_time;
+            let strictly_better = other.effective_cost_usd < candidate_cost
+                || other.time_to_green_ms < candidate_time;
             no_worse && strictly_better
         });
 
@@ -384,7 +384,11 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
             evaluation.time_to_green_ms as f64 / 1000.0,
             evaluation.effective_cost_usd,
             evaluation.cost_basis,
-            if evaluation.pareto_optimal { "yes" } else { "no" }
+            if evaluation.pareto_optimal {
+                "yes"
+            } else {
+                "no"
+            }
         ));
     }
 
@@ -467,9 +471,8 @@ mod tests {
         input.offer_id = "vm".into();
         input.utilization = Some(0.5);
 
-        let evaluation =
-            evaluate_offer(&offer, &input, &RunnerShape::new(2_000, 4 * GIB), 11_000)
-                .expect("evaluation");
+        let evaluation = evaluate_offer(&offer, &input, &RunnerShape::new(2_000, 4 * GIB), 11_000)
+            .expect("evaluation");
 
         let expected = 0.016 / (2.0 * 0.5) * 11_000.0 / 3_600_000.0;
         assert!((evaluation.effective_cost_usd - expected).abs() < 1e-12);
