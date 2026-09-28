@@ -267,9 +267,8 @@ impl Store {
             return Ok(Some(repository.to_string()));
         }
 
-        let (rows, scopes, repository): (i64, i64, Option<String>) =
-            self.connection.query_row(
-                r#"
+        let (rows, scopes, repository): (i64, i64, Option<String>) = self.connection.query_row(
+            r#"
                 SELECT
                     count(*),
                     count(DISTINCT coalesce(ci_repository, '<local>')),
@@ -277,9 +276,9 @@ impl Store {
                 FROM runs
                 WHERE job = ?
                 "#,
-                params![job],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )?;
+            params![job],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
 
         anyhow::ensure!(rows > 0, "no observations for job {job}");
         anyhow::ensure!(
