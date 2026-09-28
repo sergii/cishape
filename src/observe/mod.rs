@@ -7,7 +7,7 @@ mod linux;
 pub fn command(job: &str, program: &str, args: &[String]) -> Result<RunObservation> {
     #[cfg(target_os = "linux")]
     {
-        return linux::command(job, program, args);
+        linux::command(job, program, args)
     }
 
     #[cfg(not(target_os = "linux"))]
