@@ -22,6 +22,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - CPU and memory are independent dimensions. Never collapse them into a single scalar size.
 - Raw telemetry and historical summaries are separate data classes.
 - A recommendation must be reproducible from recorded evidence, policy, catalog, and algorithm version.
+- Optimization thresholds must live in versioned policy data rather than hidden constants.
 - Deterministic constraints run before optional AI or decision-provider reasoning.
 - Jev is optional. The core optimizer must produce useful recommendations without it.
 - Provider-specific integrations adapt to the core model. The core model must not depend on GitHub, Buildkite, Depot, Namespace, Blacksmith, or another provider.

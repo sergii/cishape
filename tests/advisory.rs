@@ -33,6 +33,8 @@ fn markdown_contains_action_and_target() {
 
     let markdown = to_markdown(&AdvisoryReport {
         schema_version: 1,
+        policy_id: "default-v1".into(),
+        policy_schema_version: 1,
         min_runs: 10,
         items: vec![item],
     });

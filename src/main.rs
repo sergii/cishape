@@ -9,7 +9,10 @@ use cishape::interchange;
 use cishape::jev_http::{DEFAULT_JEV_ENDPOINT, JevHttpClient};
 use cishape::model::{GIB, JobShape, Recommendation, RunObservation, RunnerShape};
 use cishape::observe;
-use cishape::optimize::{default_catalog, feasible_candidates, recommend};
+use cishape::optimize::{
+    default_catalog, feasible_candidates_with_policy, recommend, recommend_with_policy,
+};
+use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
 use clap::{Parser, Subcommand, ValueEnum};
@@ -102,8 +105,8 @@ enum Command {
         db: PathBuf,
         #[arg(long)]
         repository: Option<String>,
-        #[arg(long, default_value_t = 10)]
-        min_runs: u64,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
         #[arg(long, value_enum, default_value = "markdown")]
         format: AdvisoryFormat,
         #[arg(long)]
@@ -126,6 +129,8 @@ enum Command {
         repository: Option<String>,
         #[arg(long)]
         output: Option<PathBuf>,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
         job: String,
     },
     /// Prepare an offline Jev shadow decision request from historical evidence.
@@ -138,6 +143,8 @@ enum Command {
         model: String,
         #[arg(long)]
         output: Option<PathBuf>,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
         job: String,
     },
     /// Send a prepared Jev request, validate the response, and record a shadow decision.
@@ -180,6 +187,8 @@ enum Command {
         db: PathBuf,
         #[arg(long)]
         repository: Option<String>,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
         job: String,
     },
     /// Explain the deterministic recommendation and its safety margins.
@@ -188,6 +197,8 @@ enum Command {
         db: PathBuf,
         #[arg(long)]
         repository: Option<String>,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
         job: String,
     },
 }
@@ -216,13 +227,13 @@ fn main() -> Result<()> {
         Command::Advisory {
             db,
             repository,
-            min_runs,
+            policy,
             format,
             output,
         } => advisory_command(
             &db,
             repository.as_deref(),
-            min_runs,
+            &policy,
             format,
             output.as_deref(),
         ),
@@ -235,15 +246,24 @@ fn main() -> Result<()> {
             db,
             repository,
             output,
+            policy,
             job,
-        } => decide_command(&db, repository.as_deref(), &job, output.as_deref()),
+        } => decide_command(&db, repository.as_deref(), &job, &policy, output.as_deref()),
         Command::DecisionPrepare {
             db,
             repository,
             model,
             output,
+            policy,
             job,
-        } => decision_prepare_command(&db, repository.as_deref(), &job, &model, output.as_deref()),
+        } => decision_prepare_command(
+            &db,
+            repository.as_deref(),
+            &job,
+            &model,
+            &policy,
+            output.as_deref(),
+        ),
         Command::DecisionRun {
             db,
             request,
@@ -277,23 +297,29 @@ fn main() -> Result<()> {
         Command::Recommend {
             db,
             repository,
+            policy,
             job,
         } => {
             let store = Store::open(&db)?;
             let profile = store.profile_for(&job, repository.as_deref())?;
-            let recommendation = recommendation_for(&profile)?;
+            let policy = OptimizationPolicy::load(&policy)?;
+            let recommendation = recommend_with_policy(&profile, &default_catalog(), &policy)
+                .with_context(|| format!("no feasible runner candidate for {}", profile.job))?;
             print_recommendation(&recommendation);
             Ok(())
         }
         Command::Explain {
             db,
             repository,
+            policy,
             job,
         } => {
             let store = Store::open(&db)?;
             let profile = store.profile_for(&job, repository.as_deref())?;
-            let recommendation = recommendation_for(&profile)?;
-            print_explanation(&profile, &recommendation);
+            let policy = OptimizationPolicy::load(&policy)?;
+            let recommendation = recommend_with_policy(&profile, &default_catalog(), &policy)
+                .with_context(|| format!("no feasible runner candidate for {}", profile.job))?;
+            print_explanation(&profile, &recommendation, &policy);
             Ok(())
         }
     }
@@ -313,7 +339,7 @@ fn demo() -> Result<()> {
     println!();
     print_recommendation(&recommendation);
     println!();
-    print_explanation(&profile, &recommendation);
+    print_explanation(&profile, &recommendation, &OptimizationPolicy::default_v1());
 
     Ok(())
 }
@@ -460,12 +486,11 @@ fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64)
 fn advisory_command(
     db: &Path,
     repository: Option<&str>,
-    min_runs: u64,
+    policy_path: &Path,
     format: AdvisoryFormat,
     output: Option<&Path>,
 ) -> Result<()> {
-    anyhow::ensure!(min_runs > 0, "minimum evidence must be at least one run");
-
+    let policy = OptimizationPolicy::load(policy_path)?;
     let store = Store::open(db)?;
     let scopes = store.workload_scopes(repository)?;
     anyhow::ensure!(!scopes.is_empty(), "history is empty");
@@ -475,13 +500,19 @@ fn advisory_command(
 
     for scope in scopes {
         let profile = store.profile_scope(&scope.job, scope.repository.as_deref())?;
-        let recommendation = recommend(&profile, &catalog);
-        items.push(advisory_item(&profile, recommendation.as_ref(), min_runs));
+        let recommendation = recommend_with_policy(&profile, &catalog, &policy);
+        items.push(advisory_item(
+            &profile,
+            recommendation.as_ref(),
+            policy.min_runs,
+        ));
     }
 
     let report = AdvisoryReport {
         schema_version: ADVISORY_SCHEMA_VERSION,
-        min_runs,
+        policy_id: policy.policy_id.clone(),
+        policy_schema_version: policy.schema_version,
+        min_runs: policy.min_runs,
         items,
     };
 
@@ -551,14 +582,16 @@ fn decide_command(
     db: &Path,
     repository: Option<&str>,
     job: &str,
+    policy_path: &Path,
     output: Option<&Path>,
 ) -> Result<()> {
+    let policy = OptimizationPolicy::load(policy_path)?;
     let store = Store::open(db)?;
     let profile = store.profile_for(job, repository)?;
     let catalog = default_catalog();
-    let recommendation = recommend(&profile, &catalog)
+    let recommendation = recommend_with_policy(&profile, &catalog, &policy)
         .with_context(|| format!("no deterministic recommendation for {job}"))?;
-    let feasible = feasible_candidates(&profile, &catalog);
+    let feasible = feasible_candidates_with_policy(&profile, &catalog, &policy);
     let record = record_deterministic_decision(&profile, &recommendation, &feasible)?;
 
     persist_decision_record(db, &record, output)
@@ -569,14 +602,16 @@ fn decision_prepare_command(
     repository: Option<&str>,
     job: &str,
     model: &str,
+    policy_path: &Path,
     output: Option<&Path>,
 ) -> Result<()> {
+    let policy = OptimizationPolicy::load(policy_path)?;
     let store = Store::open(db)?;
     let profile = store.profile_for(job, repository)?;
     let catalog = default_catalog();
-    let recommendation = recommend(&profile, &catalog)
+    let recommendation = recommend_with_policy(&profile, &catalog, &policy)
         .with_context(|| format!("no deterministic recommendation for {job}"))?;
-    let feasible = feasible_candidates(&profile, &catalog);
+    let feasible = feasible_candidates_with_policy(&profile, &catalog, &policy);
     let bundle = prepare_jev_request(&profile, &recommendation, &feasible, Some(model))?;
 
     let output_path = output
@@ -821,7 +856,11 @@ fn print_recommendation(recommendation: &Recommendation) {
     println!("  algorithm         {}", recommendation.algorithm);
 }
 
-fn print_explanation(profile: &JobShape, recommendation: &Recommendation) {
+fn print_explanation(
+    profile: &JobShape,
+    recommendation: &Recommendation,
+    policy: &OptimizationPolicy,
+) {
     println!("Why {}?", recommendation.recommended.shape);
     println!(
         "  CPU: p95 peak {:.2} cores; candidate provides {:.1}x headroom.",
@@ -838,8 +877,12 @@ fn print_explanation(profile: &JobShape, recommendation: &Recommendation) {
         recommendation.recommended.shape.cpu_cores(),
         recommendation.recommended.shape.memory_bytes as f64 / GIB as f64
     );
-    println!("  v0 only selects candidates that preserve 1.5x CPU and memory safety margins.");
     println!(
-        "  v0 applies a conservative 5% latency penalty instead of pretending to know workload scaling."
+        "  Policy {} requires {:.2}x CPU and {:.2}x memory safety margins.",
+        policy.policy_id, policy.cpu_safety_factor, policy.memory_safety_factor
+    );
+    println!(
+        "  Policy applies a {:.2}x latency penalty; objective is {:?}.",
+        policy.latency_penalty, policy.objective
     );
 }

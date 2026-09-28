@@ -101,11 +101,13 @@ For all workload scopes at once, generate a read-only advisory:
 ```bash
 cargo run -- advisory \
   --repository sergii/cishape \
-  --min-runs 10 \
+  --policy policies/default-v1.json \
   --format markdown
 ```
 
 Low-history workloads are explicitly marked `insufficient_evidence`. Actionable rows are classified as `keep`, `downsize`, `upsize`, or `reshape`.
+
+The safety factors, evidence threshold, latency penalty, optional p95 guard, and deterministic objective live in a versioned optimization policy instead of hidden constants.
 
 Jev remains an optional shadow experiment. CIShape can prepare a bounded Jev decision request without giving the decision provider control over feasibility or execution:
 
@@ -147,7 +149,7 @@ Provider records carry pricing provenance and billing semantics. Missing RAM, pr
 
 ## Direction
 
-Jev is not on the critical path. The next product slices focus on policy configuration, outcome evaluation, and richer queue/capacity economics. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. The next product slices focus on outcome evaluation and richer queue/capacity economics. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -162,6 +164,7 @@ See:
 - [Decision providers](docs/decision-providers.md)
 - [Deterministic advisory](docs/advisory.md)
 - [Provider catalogs](docs/provider-catalogs.md)
+- [Optimization policy](docs/optimization-policy.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License
