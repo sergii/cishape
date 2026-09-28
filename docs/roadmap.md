@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1 and CAPACITY2 implemented.
+Status: CAPACITY1, CAPACITY2, and CAPACITY3 implemented.
 
 CAPACITY1:
 
@@ -165,7 +165,17 @@ CAPACITY2:
 - preserve deterministic tie-breaking with no hidden weighted score
 - keep selection advisory-only with no routing side effects
 
-Next: ingest real runtime capacity snapshots from provider adapters and surface economics-aware advisory results directly in CI.
+CAPACITY3:
+
+- preserve the single-job economics path as the default
+- add deterministic slot scheduling for N parallel identical jobs
+- schedule existing queued work before the new batch
+- use observed slot turnover for existing work and predicted runtime for new jobs
+- emit first/last job start, batch time-to-green, and total effective cost
+- apply EconomicsPolicy constraints and selection to batch totals
+- prove parallel job count can change the selected provider offer
+
+Next: model heterogeneous workflow jobs/DAGs and ingest real runtime capacity snapshots from provider adapters.
 
 ## VS9 - Cloud ingest
 
