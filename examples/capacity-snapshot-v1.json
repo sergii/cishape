@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-29T00:00:00Z",
+  "source": "synthetic-demo",
+  "states": [
+    {
+      "provider": "github-actions",
+      "offer_id": "ubuntu-latest-private-x64",
+      "queue_depth": 4,
+      "running_jobs": 20,
+      "parallel_slots": 20,
+      "slot_turnover_ms": 12000,
+      "cache_state": "cold",
+      "cache_penalty_ms": 4000,
+      "utilization": null
+    },
+    {
+      "provider": "depot",
+      "offer_id": "depot-ubuntu-24.04",
+      "queue_depth": 0,
+      "running_jobs": 1,
+      "parallel_slots": 20,
+      "slot_turnover_ms": 12000,
+      "cache_state": "warm",
+      "cache_penalty_ms": 0,
+      "utilization": null
+    },
+    {
+      "provider": "hetzner",
+      "offer_id": "cx33-eu-central",
+      "queue_depth": 3,
+      "running_jobs": 2,
+      "parallel_slots": 2,
+      "slot_turnover_ms": 11000,
+      "cache_state": "warm",
+      "cache_penalty_ms": 0,
+      "utilization": 0.5
+    }
+  ]
+}

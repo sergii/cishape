@@ -1,6 +1,7 @@
 pub mod advisory;
 pub mod catalog;
 pub mod decision;
+pub mod economics;
 pub mod interchange;
 pub mod jev_http;
 pub mod model;

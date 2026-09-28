@@ -145,7 +145,22 @@ cargo run -- catalog-fit \
   --duration-ms 11000
 ```
 
-Provider records carry pricing provenance and billing semantics. Missing RAM, price, or billing increments are kept as unknown rather than fabricated, and fixed self-hosted VM economics are not mixed with ephemeral per-job pricing.
+Provider records carry pricing provenance and billing semantics. Missing RAM, price, or billing increments are kept as unknown rather than fabricated. CATALOG1 still keeps fixed self-hosted VM pricing separate from ephemeral per-job fitting.
+
+## Capacity economics
+
+CAPACITY1 combines static provider offers with a time-scoped runtime capacity snapshot:
+
+```bash
+cargo run -- economics \
+  --snapshot examples/capacity-snapshot-v1.json \
+  --cpu 2 \
+  --memory-gib 4 \
+  --duration-ms 11000 \
+  --format markdown
+```
+
+The evaluator models queue depth, busy/parallel slots, slot turnover, warm/cold cache state, billing granularity, and fixed-server utilization. It emits effective cost and time-to-green as separate dimensions and marks Pareto-optimal options without hiding an arbitrary weighted score.
 
 ## Outcomes
 
@@ -162,7 +177,7 @@ CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction
 
 ## Direction
 
-Jev is not on the critical path. The next product slices focus on richer queue/capacity economics and CI advisory integration. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. Capacity economics is now deterministic and local-first; the next product slices can place explicit policy/SLA constraints over those economics and surface advisory results directly in CI. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -177,6 +192,7 @@ See:
 - [Decision providers](docs/decision-providers.md)
 - [Deterministic advisory](docs/advisory.md)
 - [Provider catalogs](docs/provider-catalogs.md)
+- [Capacity economics](docs/capacity-economics.md)
 - [Optimization policy](docs/optimization-policy.md)
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)

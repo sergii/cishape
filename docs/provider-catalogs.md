@@ -103,9 +103,9 @@ fixed capacity
 + operator overhead
 ```
 
-It is therefore represented in the catalog but not ranked directly against ephemeral per-job runners.
+It is therefore represented in the catalog but not ranked directly against ephemeral per-job runners by `catalog-fit`.
 
-A later capacity-economic model will calculate effective cost from observed utilization.
+CAPACITY1 adds a separate economics evaluator. It may compare fixed servers with managed offers only when a runtime capacity snapshot supplies explicit utilization, parallel-slot, queue, turnover, and cache inputs.
 
 ## Initial source snapshot
 
