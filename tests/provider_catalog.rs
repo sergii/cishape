@@ -42,16 +42,8 @@ fn github_standard_runner_context_changes_shape_and_cost() {
     let catalog = ProviderCatalog::load(&catalog_path()).expect("catalog");
     let target = RunnerShape::new(4_000, 8 * GIB);
 
-    let public = catalog.fit_with_visibility(
-        &target,
-        11_000,
-        Some(RepositoryVisibility::Public),
-    );
-    let private = catalog.fit_with_visibility(
-        &target,
-        11_000,
-        Some(RepositoryVisibility::Private),
-    );
+    let public = catalog.fit_with_visibility(&target, 11_000, Some(RepositoryVisibility::Public));
+    let private = catalog.fit_with_visibility(&target, 11_000, Some(RepositoryVisibility::Private));
 
     let public_standard = public
         .iter()
@@ -73,11 +65,8 @@ fn github_standard_runner_context_changes_shape_and_cost() {
     );
 
     let small_target = RunnerShape::new(2_000, 4 * GIB);
-    let private_small = catalog.fit_with_visibility(
-        &small_target,
-        11_000,
-        Some(RepositoryVisibility::Private),
-    );
+    let private_small =
+        catalog.fit_with_visibility(&small_target, 11_000, Some(RepositoryVisibility::Private));
     assert!(
         private_small
             .iter()
