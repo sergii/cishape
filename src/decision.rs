@@ -281,6 +281,7 @@ pub fn prepare_jev_request(
             "memory_peak_p99_bytes": decision.memory_peak_p99_bytes
         },
         "deterministic_baseline": decision.deterministic_baseline,
+        "deterministic_algorithm": recommendation.algorithm,
         "policy": {
             "mode": "shadow",
             "hard_constraints_already_applied": true,
