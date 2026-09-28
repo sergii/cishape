@@ -27,7 +27,9 @@ impl Store {
         self.connection.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS runs (
+                schema_version INTEGER NOT NULL,
                 job VARCHAR NOT NULL,
+                observed_at_unix_ms BIGINT NOT NULL,
                 duration_ms BIGINT NOT NULL,
                 cpu_seconds DOUBLE NOT NULL,
                 cpu_peak_millis INTEGER NOT NULL,
@@ -36,12 +38,11 @@ impl Store {
                 write_bytes BIGINT NOT NULL,
                 runner_cpu_millis INTEGER NOT NULL,
                 runner_memory_bytes BIGINT NOT NULL,
-                provider VARCHAR NOT NULL,
-                provider_runner VARCHAR NOT NULL,
-                queue_ms BIGINT NOT NULL,
-                cost_usd DOUBLE NOT NULL,
-                exit_code INTEGER NOT NULL,
-                sequence BIGINT NOT NULL
+                provider VARCHAR,
+                provider_runner VARCHAR,
+                queue_ms BIGINT,
+                cost_usd DOUBLE,
+                exit_code INTEGER NOT NULL
             );
             "#,
         )?;
@@ -54,16 +55,19 @@ impl Store {
             let mut statement = tx.prepare(
                 r#"
                 INSERT INTO runs (
-                    job, duration_ms, cpu_seconds, cpu_peak_millis, memory_peak_bytes,
-                    read_bytes, write_bytes, runner_cpu_millis, runner_memory_bytes,
-                    provider, provider_runner, queue_ms, cost_usd, exit_code, sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    schema_version, job, observed_at_unix_ms, duration_ms, cpu_seconds,
+                    cpu_peak_millis, memory_peak_bytes, read_bytes, write_bytes,
+                    runner_cpu_millis, runner_memory_bytes, provider, provider_runner,
+                    queue_ms, cost_usd, exit_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
             )?;
 
             for run in runs {
                 statement.execute(params![
+                    run.schema_version as i64,
                     run.job,
+                    run.observed_at_unix_ms as i64,
                     run.duration_ms as i64,
                     run.cpu_seconds,
                     run.cpu_peak_millis as i64,
@@ -74,10 +78,9 @@ impl Store {
                     run.runner.memory_bytes as i64,
                     run.provider,
                     run.provider_runner,
-                    run.queue_ms as i64,
+                    run.queue_ms.map(|value| value as i64),
                     run.cost_usd,
                     run.exit_code,
-                    run.sequence as i64,
                 ])?;
             }
         }
@@ -116,7 +119,7 @@ impl Store {
             SELECT runner_cpu_millis, runner_memory_bytes
             FROM runs
             WHERE job = ?
-            ORDER BY sequence DESC
+            ORDER BY observed_at_unix_ms DESC
             LIMIT 1
             "#,
             params![job],
