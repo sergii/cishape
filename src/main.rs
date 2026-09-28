@@ -421,12 +421,7 @@ fn catalog_command(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn catalog_fit_command(
-    path: &Path,
-    cpu: u32,
-    memory_gib: u64,
-    duration_ms: u64,
-) -> Result<()> {
+fn catalog_fit_command(path: &Path, cpu: u32, memory_gib: u64, duration_ms: u64) -> Result<()> {
     anyhow::ensure!(cpu > 0, "CPU must be positive");
     anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
     anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
