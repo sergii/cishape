@@ -54,7 +54,6 @@ fn thirty_jobs_expose_provider_parallelism_in_time_to_green() {
     assert!(hetzner.effective_cost_usd < depot.effective_cost_usd);
 }
 
-
 #[test]
 fn parallel_job_count_can_flip_policy_selection() {
     let catalog =
@@ -80,7 +79,10 @@ fn parallel_job_count_can_flip_policy_selection() {
     let policy = EconomicsPolicy::default_v1();
 
     let single = select(&economics, &policy).expect("single selection");
-    assert_eq!(single.selected.expect("single selected").provider, "hetzner");
+    assert_eq!(
+        single.selected.expect("single selected").provider,
+        "hetzner"
+    );
 
     let batch = evaluate_batch(&economics, &snapshot, 30).expect("batch economics");
     let batch_selection = select_batch(&batch, &policy).expect("batch selection");
