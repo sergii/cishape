@@ -147,9 +147,22 @@ cargo run -- catalog-fit \
 
 Provider records carry pricing provenance and billing semantics. Missing RAM, price, or billing increments are kept as unknown rather than fabricated, and fixed self-hosted VM economics are not mixed with ephemeral per-job pricing.
 
+## Outcomes
+
+A deterministic DecisionRecord can later be compared with matching post-decision observations:
+
+```bash
+cargo run -- outcome \
+  --decision .cishape/decisions/test.json \
+  --policy policies/default-v1.json \
+  --format markdown
+```
+
+CIShape distinguishes `not_applied`, `insufficient_evidence`, `within_prediction`, `outside_prediction`, and `mixed_failures`. The evaluation is observational and does not claim that a runner change caused a workload failure or latency change.
+
 ## Direction
 
-Jev is not on the critical path. The next product slices focus on outcome evaluation and richer queue/capacity economics. OpenTelemetry/Parquet interchange remains a follow-up.
+Jev is not on the critical path. The next product slices focus on richer queue/capacity economics and CI advisory integration. OpenTelemetry/Parquet interchange remains a follow-up.
 
 CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, and other systems remain responsible for execution. CIShape observes, models, recommends, and later may provide routing decisions.
 
@@ -165,6 +178,7 @@ See:
 - [Deterministic advisory](docs/advisory.md)
 - [Provider catalogs](docs/provider-catalogs.md)
 - [Optimization policy](docs/optimization-policy.md)
+- [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License

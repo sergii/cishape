@@ -120,7 +120,7 @@ Next: refresh adapters/API-backed catalogs where providers expose reliable machi
 
 ## VS7 - Policy and outcomes
 
-Status: POLICY1 implemented; OUTCOME1 remains next.
+Status: POLICY1 and OUTCOME1 implemented.
 
 POLICY1:
 
@@ -131,7 +131,15 @@ POLICY1:
 - deterministic objective
 - policy identity in recommendation/advisory evidence
 
-Next: compare recorded recommendations with later observed outcomes.
+OUTCOME1:
+
+- DecisionRecord v2 carries baseline/selected RunnerShape and predicted latency
+- post-decision observations are matched by repository/job/selected shape
+- statuses distinguish not applied, insufficient evidence, within/outside prediction, and mixed failures
+- Markdown/JSON outcome evidence remains local and deterministic
+- no causal claim is made from temporal correlation alone
+
+Next: model queue/capacity economics and surface advisory results directly in CI.
 
 ## VS8 - Cloud ingest
 

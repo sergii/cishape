@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const DECISION_SCHEMA_VERSION: u32 = 1;
+pub const DECISION_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_JEV_MODEL: &str = "jev-latest";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -76,6 +76,8 @@ pub struct DecisionRequest {
     pub duration_p95_ms: f64,
     pub cpu_peak_p95_millis: f64,
     pub memory_peak_p99_bytes: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predicted_p95_ms: Option<f64>,
     pub deterministic_baseline: String,
     pub candidates: Vec<DecisionCandidate>,
 }
@@ -135,6 +137,14 @@ pub struct DecisionRecord {
     pub evidence_runs: u64,
     pub deterministic_baseline: String,
     pub selected_candidate: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_runner: Option<RunnerShape>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_runner: Option<RunnerShape>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_duration_p95_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predicted_p95_ms: Option<f64>,
     pub confidence: f64,
     pub probabilities: BTreeMap<String, f64>,
     pub model: String,
@@ -177,6 +187,10 @@ pub fn record_deterministic_decision(
         evidence_runs: profile.runs,
         deterministic_baseline: selected.clone(),
         selected_candidate: selected,
+        baseline_runner: Some(profile.current_runner.clone()),
+        selected_runner: Some(recommendation.recommended.shape.clone()),
+        baseline_duration_p95_ms: Some(profile.duration_p95_ms),
+        predicted_p95_ms: Some(recommendation.predicted_p95_ms),
         confidence: 1.0,
         probabilities,
         model: recommendation.algorithm.clone(),
@@ -240,6 +254,7 @@ pub fn prepare_jev_request(
         duration_p95_ms: profile.duration_p95_ms,
         cpu_peak_p95_millis: profile.cpu_peak_p95_millis,
         memory_peak_p99_bytes: profile.memory_peak_p99_bytes,
+        predicted_p95_ms: Some(recommendation.predicted_p95_ms),
         deterministic_baseline: recommendation.recommended.name.clone(),
         candidates,
     };
@@ -341,6 +356,14 @@ pub fn record_jev_response(
         );
     }
 
+    let selected_runner = bundle
+        .decision
+        .candidates
+        .iter()
+        .find(|candidate| candidate.id == answer.choice)
+        .map(|candidate| candidate.runner.clone())
+        .context("selected Jev candidate has no runner shape")?;
+
     Ok(DecisionRecord {
         schema_version: DECISION_SCHEMA_VERSION,
         request_id: bundle.decision.request_id.clone(),
@@ -352,6 +375,10 @@ pub fn record_jev_response(
         evidence_runs: bundle.decision.evidence_runs,
         deterministic_baseline: bundle.decision.deterministic_baseline.clone(),
         selected_candidate: answer.choice.clone(),
+        baseline_runner: Some(bundle.decision.current_runner.clone()),
+        selected_runner: Some(selected_runner),
+        baseline_duration_p95_ms: Some(bundle.decision.duration_p95_ms),
+        predicted_p95_ms: bundle.decision.predicted_p95_ms,
         confidence: answer.confidence,
         probabilities: answer.probabilities.clone(),
         model: response.model,

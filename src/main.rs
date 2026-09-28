@@ -12,6 +12,7 @@ use cishape::observe;
 use cishape::optimize::{
     default_catalog, feasible_candidates_with_policy, recommend, recommend_with_policy,
 };
+use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_markdown};
 use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
@@ -39,6 +40,12 @@ enum ReportFormat {
 
 #[derive(Clone, Debug, ValueEnum)]
 enum AdvisoryFormat {
+    Json,
+    Markdown,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum OutcomeFormat {
     Json,
     Markdown,
 }
@@ -109,6 +116,19 @@ enum Command {
         policy: PathBuf,
         #[arg(long, value_enum, default_value = "markdown")]
         format: AdvisoryFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Evaluate one recorded decision against later matching observations.
+    Outcome {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        decision: PathBuf,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: OutcomeFormat,
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -237,6 +257,13 @@ fn main() -> Result<()> {
             format,
             output.as_deref(),
         ),
+        Command::Outcome {
+            db,
+            decision,
+            policy,
+            format,
+            output,
+        } => outcome_command(&db, &decision, &policy, format, output.as_deref()),
         Command::Report {
             db,
             repository,
@@ -528,6 +555,46 @@ fn advisory_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote deterministic advisory to {}", path.display());
+    } else {
+        print!("{payload}");
+        if !payload.ends_with('\n') {
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+fn outcome_command(
+    db: &Path,
+    decision_path: &Path,
+    policy_path: &Path,
+    format: OutcomeFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    let policy = OptimizationPolicy::load(policy_path)?;
+    let decision: cishape::decision::DecisionRecord = serde_json::from_slice(
+        &std::fs::read(decision_path)
+            .with_context(|| format!("read {}", decision_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", decision_path.display()))?;
+
+    let store = Store::open(db)?;
+    let observations = store.all_runs()?;
+    let outcome = evaluate_outcome(&decision, &observations, policy.min_runs)?;
+
+    let payload = match format {
+        OutcomeFormat::Json => {
+            serde_json::to_string_pretty(&outcome).context("serialize outcome")?
+        }
+        OutcomeFormat::Markdown => outcome_to_markdown(&outcome),
+    };
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote outcome evidence to {}", path.display());
     } else {
         print!("{payload}");
         if !payload.ends_with('\n') {
