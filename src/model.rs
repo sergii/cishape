@@ -29,13 +29,17 @@ impl RunnerShape {
     pub fn id(&self) -> String {
         let cores = self.cpu_millis / 1000;
         let memory_gib = self.memory_bytes / GIB;
-        format!("C{cores}-M{memory_gib}")
+        format!("cpu{cores}-mem{memory_gib}")
+    }
+
+    pub fn display_id(&self) -> String {
+        self.id().to_ascii_uppercase()
     }
 }
 
 impl fmt::Display for RunnerShape {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.id())
+        write!(f, "{}", self.display_id())
     }
 }
 
@@ -87,4 +91,17 @@ pub struct Recommendation {
     pub cpu_headroom: f64,
     pub memory_headroom: f64,
     pub algorithm: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runner_shape_has_stable_external_and_display_ids() {
+        let shape = RunnerShape::new(8_000, 16 * GIB);
+
+        assert_eq!(shape.id(), "cpu8-mem16");
+        assert_eq!(shape.display_id(), "CPU8-MEM16");
+    }
 }
