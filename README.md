@@ -96,6 +96,17 @@ cargo run -- decide \
 
 CIShape profiles the historical workload, filters infeasible runner shapes, chooses the deterministic baseline, and persists a provider-neutral DecisionRecord.
 
+For all workload scopes at once, generate a read-only advisory:
+
+```bash
+cargo run -- advisory \
+  --repository sergii/cishape \
+  --min-runs 10 \
+  --format markdown
+```
+
+Low-history workloads are explicitly marked `insufficient_evidence`. Actionable rows are classified as `keep`, `downsize`, `upsize`, or `reshape`.
+
 Jev remains an optional shadow experiment. CIShape can prepare a bounded Jev decision request without giving the decision provider control over feasibility or execution:
 
 ```bash
@@ -134,6 +145,7 @@ See:
 - [Telemetry model v0](docs/telemetry-model-v0.md)
 - [Portable history](docs/portable-history.md)
 - [Decision providers](docs/decision-providers.md)
+- [Deterministic advisory](docs/advisory.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
 ## License

@@ -94,12 +94,15 @@ LIVE1 adds a manual GitHub Actions Jev proof that consumes rolling history. Runn
 
 ## VS5 - Deterministic advisory
 
+Status: Implemented.
+
 Turn accumulated history into actionable, backend-free suggestions:
 
-- generate deterministic decisions for every workload scope
-- classify keep/downsize/upsize/no-decision
+- evaluate every workload scope against the deterministic catalog
+- classify insufficient_evidence/keep/downsize/upsize/reshape/no_candidate
 - emit Markdown/JSON advisory reports
 - require minimum evidence before actionable changes
+- dogfood the report from rolling GitHub Actions history
 - keep execution unchanged
 
 ## VS6 - Provider catalogs and outcomes

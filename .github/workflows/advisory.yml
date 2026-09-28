@@ -1,0 +1,150 @@
+name: CI Advisory
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: CIShape repository scope from rolling history
+        required: true
+        default: sergii/cishape
+        type: string
+      min_runs:
+        description: Minimum historical runs before an advisory is actionable
+        required: true
+        default: "10"
+        type: string
+  workflow_run:
+    workflows:
+      - CI History
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cishape-advisory
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  advisory:
+    name: advisory
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+          gh --version
+
+      - name: Resolve dependency graph
+        run: cargo generate-lockfile
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: cishape-ci
+          key: duckdb-1.10505.0
+
+      - name: Build CIShape
+        run: cargo build --locked --bin cishape
+
+      - name: Download latest rolling history
+        id: history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cishape/advisory/history
+
+          artifact_id="$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100"               --jq '[.artifacts[]
+                | select(.expired == false)
+                | select(.name | startswith("cishape-history-"))]
+                | sort_by(.created_at)
+                | reverse
+                | .[0].id // empty'
+          )"
+
+          if [ -z "${artifact_id}" ]; then
+            echo "No non-expired cishape-history-* artifact is available." >&2
+            exit 1
+          fi
+
+          gh api             -H "Accept: application/vnd.github+json"             "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip"             > .cishape/advisory/history/history.zip
+
+          unzip -q .cishape/advisory/history/history.zip -d .cishape/advisory/history/unpacked
+          rm .cishape/advisory/history/history.zip
+
+          db_path="$(find .cishape/advisory/history/unpacked -type f -name cishape.duckdb -print -quit)"
+          if [ -z "${db_path}" ]; then
+            echo "Rolling history artifact does not contain cishape.duckdb." >&2
+            exit 1
+          fi
+
+          echo "artifact_id=${artifact_id}" >> "${GITHUB_OUTPUT}"
+          echo "db_path=${db_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve advisory inputs
+        id: inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_REPOSITORY: ${{ inputs.repository }}
+          MANUAL_MIN_RUNS: ${{ inputs.min_runs }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            repository="${MANUAL_REPOSITORY}"
+            min_runs="${MANUAL_MIN_RUNS}"
+          else
+            repository="${GITHUB_REPOSITORY}"
+            min_runs="10"
+          fi
+
+          if ! [[ "${min_runs}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "min_runs must be a positive integer." >&2
+            exit 1
+          fi
+
+          echo "repository=${repository}" >> "${GITHUB_OUTPUT}"
+          echo "min_runs=${min_runs}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate deterministic advisory
+        run: |
+          set -euo pipefail
+          mkdir -p .cishape/advisory/output
+
+          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --min-runs "${{ steps.inputs.outputs.min_runs }}"             --format markdown             --output .cishape/advisory/output/advisory.md
+
+          target/debug/cishape advisory             --db "${{ steps.history.outputs.db_path }}"             --repository "${{ steps.inputs.outputs.repository }}"             --min-runs "${{ steps.inputs.outputs.min_runs }}"             --format json             --output .cishape/advisory/output/advisory.json
+
+          cat .cishape/advisory/output/advisory.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload advisory evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cishape-advisory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .cishape/advisory/output/advisory.md
+            .cishape/advisory/output/advisory.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30

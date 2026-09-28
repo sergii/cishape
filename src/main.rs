@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
     record_jev_response,
@@ -29,6 +30,12 @@ enum ExportFormat {
 #[derive(Clone, Debug, ValueEnum)]
 enum ReportFormat {
     Text,
+    Markdown,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum AdvisoryFormat {
+    Json,
     Markdown,
 }
 
@@ -69,6 +76,19 @@ enum Command {
         db: PathBuf,
         #[arg(long, value_enum, default_value = "jsonl")]
         format: ExportFormat,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Build a deterministic advisory report over all workload scopes.
+    Advisory {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long, default_value_t = 10)]
+        min_runs: u64,
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: AdvisoryFormat,
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -169,6 +189,19 @@ fn main() -> Result<()> {
         } => observe_command(&job, &db, output.as_deref(), &command),
         Command::Import { db, files } => import_command(&db, &files),
         Command::Export { db, format, output } => export_command(&db, format, output.as_deref()),
+        Command::Advisory {
+            db,
+            repository,
+            min_runs,
+            format,
+            output,
+        } => advisory_command(
+            &db,
+            repository.as_deref(),
+            min_runs,
+            format,
+            output.as_deref(),
+        ),
         Command::Report {
             db,
             repository,
@@ -334,6 +367,56 @@ fn export_command(db: &Path, format: ExportFormat, output: Option<&Path>) -> Res
         (ExportFormat::Jsonl, None) => {
             let stdout = std::io::stdout();
             interchange::write_jsonl(&runs, stdout.lock())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn advisory_command(
+    db: &Path,
+    repository: Option<&str>,
+    min_runs: u64,
+    format: AdvisoryFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    anyhow::ensure!(min_runs > 0, "minimum evidence must be at least one run");
+
+    let store = Store::open(db)?;
+    let scopes = store.workload_scopes(repository)?;
+    anyhow::ensure!(!scopes.is_empty(), "history is empty");
+
+    let catalog = default_catalog();
+    let mut items = Vec::with_capacity(scopes.len());
+
+    for scope in scopes {
+        let profile = store.profile_scope(&scope.job, scope.repository.as_deref())?;
+        let recommendation = recommend(&profile, &catalog);
+        items.push(advisory_item(&profile, recommendation.as_ref(), min_runs));
+    }
+
+    let report = AdvisoryReport {
+        schema_version: ADVISORY_SCHEMA_VERSION,
+        min_runs,
+        items,
+    };
+
+    let payload = match format {
+        AdvisoryFormat::Json => {
+            serde_json::to_string_pretty(&report).context("serialize advisory report")?
+        }
+        AdvisoryFormat::Markdown => to_markdown(&report),
+    };
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote deterministic advisory to {}", path.display());
+    } else {
+        print!("{payload}");
+        if !payload.ends_with('\n') {
+            println!();
         }
     }
 
