@@ -207,7 +207,11 @@ pub fn to_markdown(report: &BatchEconomicsReport) -> String {
             evaluation.time_to_green_ms as f64 / 1000.0,
             evaluation.per_job_effective_cost_usd,
             evaluation.effective_cost_usd,
-            if evaluation.pareto_optimal { "yes" } else { "no" }
+            if evaluation.pareto_optimal {
+                "yes"
+            } else {
+                "no"
+            }
         ));
     }
 
