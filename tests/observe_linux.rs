@@ -5,12 +5,8 @@ use tempfile::tempdir;
 
 #[test]
 fn observe_records_a_successful_command() {
-    let observation = cishape::observe::command(
-        "smoke",
-        "sh",
-        &["-c".into(), "sleep 0.2".into()],
-    )
-    .expect("observation");
+    let observation = cishape::observe::command("smoke", "sh", &["-c".into(), "sleep 0.2".into()])
+        .expect("observation");
 
     assert_eq!(observation.exit_code, 0);
     assert!(observation.duration_ms >= 100);
