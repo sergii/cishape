@@ -18,7 +18,7 @@ CIShape is not a CI control plane and must not become one by accident.
 ## Core invariants
 
 - Canonical runner capacity is numeric. Provider labels such as small, large, or xlarge are aliases only.
-- Use RunnerShape identities such as C4-M8 for display, backed by explicit numeric fields.
+- Use RunnerShape external identities such as `cpu4-mem8` and display identities such as `CPU4-MEM8`, backed by explicit numeric fields.
 - CPU and memory are independent dimensions. Never collapse them into a single scalar size.
 - Raw telemetry and historical summaries are separate data classes.
 - A recommendation must be reproducible from recorded evidence, policy, catalog, and algorithm version.
