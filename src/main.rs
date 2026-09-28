@@ -287,8 +287,7 @@ fn main() -> Result<()> {
             &catalog,
             &snapshot,
             &policy,
-            cpu,
-            memory_gib,
+            (cpu, memory_gib),
             duration_ms,
             format,
             output.as_deref(),
@@ -563,12 +562,12 @@ fn economics_command(
     catalog_path: &Path,
     snapshot_path: &Path,
     policy_path: &Path,
-    cpu: u32,
-    memory_gib: u64,
+    target_capacity: (u32, u64),
     duration_ms: u64,
     format: EconomicsFormat,
     output: Option<&Path>,
 ) -> Result<()> {
+    let (cpu, memory_gib) = target_capacity;
     anyhow::ensure!(cpu > 0, "CPU must be positive");
     anyhow::ensure!(memory_gib > 0, "memory-gib must be positive");
     anyhow::ensure!(duration_ms > 0, "duration-ms must be positive");
