@@ -143,7 +143,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, CAPACITY6, and CAPACITY7 implemented.
+Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, CAPACITY6, CAPACITY7, and CAPACITY8 implemented.
 
 CAPACITY1:
 
@@ -219,7 +219,18 @@ CAPACITY7:
 - preserve full EconomicsReport/EconomicsSelection evidence in JSON
 - remain advisory-only
 
-Next: dogfood live multi-pool economics advisory in GitHub Actions and add provider-specific discovery where reliable.
+CAPACITY8:
+
+- preserve deterministic advisory as the always-on CI path
+- add optional live multi-pool capacity collection to the CI Advisory workflow
+- activate economics only from an explicit manual capacity-plan path or the conventional checked-in real-evidence plan
+- skip cleanly when no plan exists instead of substituting example/default capacity
+- fail closed when a manually requested plan path does not exist
+- publish live CapacitySnapshot plus Markdown/JSON economics advisory evidence
+- append economics advisory to the GitHub job summary
+- preserve read-only permissions and no routing side effects
+
+Next: add provider-specific capacity/catalog discovery where APIs expose reliable facts, then validate economics advisory against real account capacity evidence.
 
 ## VS9 - Cloud ingest
 
