@@ -161,22 +161,22 @@ pub fn select(report: &EconomicsReport, policy: &EconomicsPolicy) -> Result<Econ
 fn exclusion_reasons(evaluation: &EconomicsEvaluation, policy: &EconomicsPolicy) -> Vec<String> {
     let mut reasons = Vec::new();
 
-    if let Some(limit) = policy.max_time_to_green_ms {
-        if evaluation.time_to_green_ms > limit {
-            reasons.push(format!(
-                "time_to_green_ms {} exceeds policy limit {}",
-                evaluation.time_to_green_ms, limit
-            ));
-        }
+    if let Some(limit) = policy.max_time_to_green_ms
+        && evaluation.time_to_green_ms > limit
+    {
+        reasons.push(format!(
+            "time_to_green_ms {} exceeds policy limit {}",
+            evaluation.time_to_green_ms, limit
+        ));
     }
 
-    if let Some(limit) = policy.max_effective_cost_usd {
-        if evaluation.effective_cost_usd > limit {
-            reasons.push(format!(
-                "effective_cost_usd {:.6} exceeds policy limit {:.6}",
-                evaluation.effective_cost_usd, limit
-            ));
-        }
+    if let Some(limit) = policy.max_effective_cost_usd
+        && evaluation.effective_cost_usd > limit
+    {
+        reasons.push(format!(
+            "effective_cost_usd {:.6} exceeds policy limit {:.6}",
+            evaluation.effective_cost_usd, limit
+        ));
     }
 
     reasons
