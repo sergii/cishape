@@ -69,10 +69,10 @@ A `RunnerShape` describes offered capacity with explicit numeric dimensions.
 Display identity:
 
 ```text
-C8-M16
+CPU8-MEM16
 ```
 
-means 8 vCPU and 16 GiB RAM.
+means 8 vCPU and 16 GiB RAM. The stable external identifier is `cpu8-mem16`; the uppercase form is presentation only.
 
 CPU and memory remain independent dimensions.
 
