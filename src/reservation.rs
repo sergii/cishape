@@ -38,7 +38,10 @@ impl ReservationPolicy {
             self.schema_version
         );
         anyhow::ensure!(!self.policy_id.trim().is_empty(), "policy_id is required");
-        anyhow::ensure!(self.min_lease_ttl_ms > 0, "min_lease_ttl_ms must be positive");
+        anyhow::ensure!(
+            self.min_lease_ttl_ms > 0,
+            "min_lease_ttl_ms must be positive"
+        );
         anyhow::ensure!(
             self.max_lease_ttl_ms >= self.min_lease_ttl_ms,
             "max_lease_ttl_ms must be >= min_lease_ttl_ms"
@@ -121,7 +124,10 @@ impl ReservationLease {
         anyhow::ensure!(!self.lease_id.trim().is_empty(), "lease_id is required");
         anyhow::ensure!(!self.request_id.trim().is_empty(), "request_id is required");
         anyhow::ensure!(!self.worker_id.trim().is_empty(), "worker_id is required");
-        anyhow::ensure!(!self.executor_id.trim().is_empty(), "executor_id is required");
+        anyhow::ensure!(
+            !self.executor_id.trim().is_empty(),
+            "executor_id is required"
+        );
         self.plan.validate()?;
         anyhow::ensure!(
             self.reserved_capacity == self.plan.target_runner,
@@ -865,9 +871,15 @@ mod tests {
 
         assert_eq!(released.outcome, ReservationOutcome::Released);
         assert_eq!(released.worker_after.state_revision, 9);
-        assert_eq!(released.worker_after.reserved_capacity, RunnerShape::new(0, 0));
+        assert_eq!(
+            released.worker_after.reserved_capacity,
+            RunnerShape::new(0, 0)
+        );
         assert_eq!(released.worker_after.reserved_allocations, 0);
-        assert_eq!(released.ledger_after.leases[0].status, LeaseStatus::Released);
+        assert_eq!(
+            released.ledger_after.leases[0].status,
+            LeaseStatus::Released
+        );
     }
 
     #[test]
