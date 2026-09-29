@@ -1,5 +1,5 @@
 use crate::catalog::{ProviderCatalog, RepositoryVisibility};
-use crate::economics::{CapacitySnapshot, CapacityState, evaluate_offer};
+use crate::economics::{CapacityScope, CapacitySnapshot, CapacityState, evaluate_offer};
 use crate::model::RunnerShape;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -131,6 +131,8 @@ pub struct WorkflowEconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
     pub offer_shape: RunnerShape,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<CapacityScope>,
     pub queue_depth: u32,
     pub running_jobs: u32,
     pub parallel_slots: u32,
@@ -362,6 +364,7 @@ fn schedule(
         provider: String::new(),
         offer_id: String::new(),
         offer_shape: RunnerShape::new(1, 1),
+        scope: state.scope.clone(),
         queue_depth: state.queue_depth,
         running_jobs: state.running_jobs,
         parallel_slots: state.parallel_slots,
@@ -492,15 +495,20 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
     }
     output.push('\n');
     output.push_str(
-        "| Provider | Offer | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
+        "| Provider | Offer | Scope | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
     );
-    output.push_str("| --- | --- | ---: | ---: | ---: | ---: | --- |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
         output.push_str(&format!(
-            "| {} | {} | {} | {:.2}s | {:.2}s | ${:.6} | {} |\n",
+            "| {} | {} | {} | {} | {:.2}s | {:.2}s | ${:.6} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            evaluation
+                .scope
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "-".into()),
             evaluation.parallel_slots,
             evaluation.critical_path_ms as f64 / 1000.0,
             evaluation.time_to_green_ms as f64 / 1000.0,
