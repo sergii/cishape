@@ -204,14 +204,20 @@ pub fn to_markdown(report: &BatchEconomicsReport) -> String {
         output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
     }
     output.push_str(&format!("- Jobs: {}\n\n", report.parallel_jobs));
-    output.push_str("| Provider | Offer | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
-    output.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
+        let scope = evaluation
+            .capacity_scope
+            .as_ref()
+            .map(|scope| format!("{}:{}", scope.kind, scope.key))
+            .unwrap_or_else(|| "-".into());
         output.push_str(&format!(
-            "| {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
+            "| {} | {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            scope,
             evaluation.parallel_jobs,
             evaluation.first_job_start_ms as f64 / 1000.0,
             evaluation.last_job_start_ms as f64 / 1000.0,
