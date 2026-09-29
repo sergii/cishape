@@ -277,7 +277,7 @@ pub fn evaluate(
         AdmissionOutcome::NoEligibleWorker
     };
 
-    Ok(AdmissionReport {
+    let report = AdmissionReport {
         schema_version: ADMISSION_REPORT_SCHEMA_VERSION,
         algorithm: ADMISSION_ALGORITHM_VERSION.into(),
         policy_id: policy.policy_id.clone(),
@@ -289,7 +289,9 @@ pub fn evaluate(
         outcome,
         admissible_worker_ids,
         workers: evaluations,
-    })
+    };
+    report.validate()?;
+    Ok(report)
 }
 
 fn evaluate_worker(
