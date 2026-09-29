@@ -1027,6 +1027,132 @@ mod tests {
     }
 
     #[test]
+    fn execution_claim_moves_reserved_to_allocated_transactionally() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+
+        let execution = store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &["/bin/echo".into(), "cishape".into()],
+                1_000_100,
+            )
+            .expect("claim");
+
+        assert_eq!(execution.status, ExecutionStatus::Starting);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 9);
+        assert_eq!(worker.reserved_capacity, RunnerShape::new(0, 0));
+        assert_eq!(
+            worker.allocated_capacity,
+            RunnerShape::new(24_000, 48 * GIB)
+        );
+        assert_eq!(worker.reserved_allocations, 0);
+        assert_eq!(worker.running_allocations, 7);
+        assert_eq!(
+            store.ledger().expect("ledger").leases[0].status,
+            LeaseStatus::Claimed
+        );
+        assert_eq!(
+            store.execution("exec-1").expect("execution"),
+            execution
+        );
+    }
+
+    #[test]
+    fn execution_claim_replay_is_idempotent_and_one_lease_has_one_execution() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+        let command = vec!["true".to_string()];
+
+        let first = store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &command,
+                1_000_100,
+            )
+            .expect("first claim");
+        let replay = store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &command,
+                1_000_200,
+            )
+            .expect("replay");
+
+        assert_eq!(replay, first);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 9);
+        assert_eq!(worker.running_allocations, 7);
+
+        let error = store
+            .claim_execution(
+                "req-1",
+                "exec-2",
+                "test-backend",
+                &command,
+                1_000_300,
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("already belongs"));
+    }
+
+    #[test]
+    fn running_and_finish_execution_release_allocated_capacity() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+        store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &["true".into()],
+                1_000_100,
+            )
+            .expect("claim");
+
+        let running = store
+            .mark_execution_running("exec-1", "backend-resource-1", 1_000_200)
+            .expect("running");
+        assert_eq!(running.status, ExecutionStatus::Running);
+
+        let finished = store
+            .finish_execution(
+                "exec-1",
+                &ExecutionCompletion {
+                    exit_code: Some(0),
+                    stdout: "ok\n".into(),
+                    stderr: String::new(),
+                    error: None,
+                    cleanup: crate::executor::CleanupStatus::Succeeded,
+                },
+                1_000_300,
+            )
+            .expect("finish");
+
+        assert_eq!(finished.status, ExecutionStatus::Succeeded);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 10);
+        assert_eq!(
+            worker.allocated_capacity,
+            RunnerShape::new(20_000, 40 * GIB)
+        );
+        assert_eq!(worker.running_allocations, 6);
+    }
+
+    #[test]
     fn seeding_existing_worker_is_idempotent_but_cannot_overwrite_state() {
         let mut store = seeded_store();
         assert_eq!(store.seed_workers(&snapshot()).expect("idempotent seed"), 0);
