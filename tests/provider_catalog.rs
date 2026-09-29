@@ -42,10 +42,7 @@ fn checked_in_provider_catalog_validates() {
 fn github_standard_runners_require_provider_account_capacity_scope() {
     let catalog = ProviderCatalog::load(&catalog_path()).expect("catalog");
 
-    for offer_id in [
-        "ubuntu-latest-public-x64",
-        "ubuntu-latest-private-x64",
-    ] {
+    for offer_id in ["ubuntu-latest-public-x64", "ubuntu-latest-private-x64"] {
         let offer = catalog
             .offers
             .iter()
