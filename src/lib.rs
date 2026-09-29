@@ -1,5 +1,6 @@
 pub mod advisory;
 pub mod batch;
+pub mod binding;
 pub mod capacity_scope;
 pub mod catalog;
 pub mod decision;
