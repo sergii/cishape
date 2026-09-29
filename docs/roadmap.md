@@ -385,6 +385,23 @@ RELEASE2 proof:
 
 CIShape v0.1.0 is the completed OSS/local-first milestone. Further cloud ingest, wider provider coverage, platform packaging, and controlled routing are post-v0.1 work.
 
+## V0.1.1 packaging patch
+
+Status: RELEASE3 in progress.
+
+Manual acceptance of the public v0.1.0 artifact found two distribution bugs:
+
+- checksum files referenced the build-time `dist/` path instead of the downloaded archive basename
+- standalone archives omitted the default `policies/` and `catalogs/` runtime data required by default CLI paths
+
+RELEASE3:
+
+- bump package version to `0.1.1`
+- include complete `policies/` and `catalogs/` directories in the Linux archive
+- generate portable checksum files using only the archive basename
+- add an extracted-package acceptance gate for observe/report/profile/recommend/explain/advisory/catalog
+- publish a new `v0.1.1` tag/release without mutating v0.1.0
+
 ## VS9 - Cloud ingest
 
 Only after local dogfood proves useful:
