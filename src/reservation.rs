@@ -90,6 +90,7 @@ impl ReservationRequest {
 #[serde(rename_all = "snake_case")]
 pub enum LeaseStatus {
     Active,
+    Claimed,
     Released,
     Expired,
 }
@@ -162,6 +163,15 @@ impl ReservationLease {
                 self.terminal_at_unix_ms.is_none(),
                 "active lease must not have terminal timestamp"
             ),
+            LeaseStatus::Claimed => {
+                let terminal = self
+                    .terminal_at_unix_ms
+                    .context("claimed lease must have terminal timestamp")?;
+                anyhow::ensure!(
+                    terminal >= self.created_at_unix_ms && terminal < self.expires_at_unix_ms,
+                    "claimed lease terminal timestamp must be within the active lease window"
+                );
+            }
             LeaseStatus::Released => {
                 let terminal = self
                     .terminal_at_unix_ms
