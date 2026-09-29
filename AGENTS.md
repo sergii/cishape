@@ -33,6 +33,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - Do not compare fixed self-hosted server pricing to ephemeral per-job runner pricing without an explicit utilization/capacity model.
 - Runtime queue/capacity snapshots are time-scoped observations and must remain separate from static provider catalog facts.
 - Concurrency evidence must cover the same scope as the capacity limit it is paired with. If an offer requires provider-account scope, repository-scoped queue/running observations are insufficient and must fail closed.
+- Provider-account evidence may be emitted only when the adapter can prove its inventory is complete for that account scope. Partial repository visibility must fail the whole snapshot rather than be treated as zero activity.
 - Provider capacity adapters are read-only evidence collectors. They must normalize into CapacitySnapshot instead of leaking provider API types into core economics.
 - If a provider endpoint does not reliably expose concurrency capacity, turnover, cache behavior, or another required field, require explicit evidence/configuration rather than inventing a default.
 - Multi-pool capacity observation must not double-count an active job. If configured runner-label selectors overlap for an observed job, fail closed until the selectors are made unambiguous.
