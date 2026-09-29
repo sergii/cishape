@@ -18,5 +18,5 @@ pub mod outcome;
 pub mod policy;
 pub mod store;
 pub mod synthetic;
-pub mod workflow;
 pub mod worker_state;
+pub mod workflow;
