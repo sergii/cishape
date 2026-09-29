@@ -44,6 +44,9 @@ CIShape remains read-only: it observes and recommends; it does not rewrite `runs
 
 See the copy-paste [v0.1 quickstart](docs/quickstart.md) for the complete first-run flow and the optional Jev/capacity layers.
 
+
+A manual-only [release-candidate workflow](docs/release-candidate.md) can produce a locked Linux x86_64 binary, checksum, and provenance manifest without publishing a release. Public distribution remains blocked until the repository license is explicitly selected.
+
 ## POC0
 
 The first vertical slice is intentionally local and synthetic:
@@ -283,6 +286,7 @@ CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, a
 See:
 
 - [v0.1 quickstart](docs/quickstart.md)
+- [Release candidate](docs/release-candidate.md)
 - [Architecture](docs/architecture.md)
 - [RFC-0001](docs/rfc/0001-poc-and-core-model.md)
 - [Roadmap](docs/roadmap.md)
