@@ -12,6 +12,10 @@ The GitHub adapter is read-only. It first reads repository metadata to record wh
 
 The GitHub API is the observation source, not necessarily the runner provider. The provider remains an explicit input so the same control plane can observe GitHub-hosted, Depot, or self-hosted runner labels without rewriting provider identity.
 
+Every state emitted by the current GitHub adapter is explicitly scoped to `repository:<owner/name>`, because the adapter traverses active runs for exactly one repository. It does not relabel this as account-wide evidence even when a configured `parallel_slots` value came from an account plan.
+
+This matters for standard GitHub-hosted runners: their total concurrency is plan/account scoped. Those catalog offers therefore require `provider_account` evidence and will not be selected from a repository-scoped snapshot. A later account/org observer must collect the broader active-job set before CIShape can make that comparison safely.
+
 The adapter does not infer facts that the selected GitHub REST endpoints do not expose reliably for the target capacity pool.
 
 Therefore these remain explicit inputs:
