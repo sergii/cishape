@@ -296,6 +296,30 @@ ONBOARD1:
 
 Next after ONBOARD1: release/package boundary, including the unresolved repository license decision.
 
+## V0.1 release candidate
+
+Status: RELEASE1 in progress.
+
+Goal:
+
+```text
+main -> locked release build -> smoke -> archive -> checksum -> provenance
+```
+
+RELEASE1:
+
+- manual-only Linux x86_64 release-candidate workflow
+- derive version from Cargo metadata
+- build with the pinned toolchain and lockfile
+- smoke the release binary
+- package binary + README + quickstart
+- generate SHA-256 checksum and provenance manifest
+- upload workflow artifact only
+- no tag, GitHub Release, crates.io publish, signing, or deployment
+- keep the unresolved license as an explicit public-publishing blocker
+
+Next after RELEASE1: decide the repository license, then define RELEASE2 publication/platform scope.
+
 ## VS9 - Cloud ingest
 
 Only after local dogfood proves useful:
