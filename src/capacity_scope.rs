@@ -32,7 +32,10 @@ impl CapacityScope {
     }
 
     pub fn validate(&self) -> Result<()> {
-        anyhow::ensure!(!self.key.trim().is_empty(), "capacity scope key is required");
+        anyhow::ensure!(
+            !self.key.trim().is_empty(),
+            "capacity scope key is required"
+        );
         Ok(())
     }
 }
