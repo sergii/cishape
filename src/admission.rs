@@ -53,10 +53,7 @@ impl AdmissionPolicy {
         );
         anyhow::ensure!(!self.policy_id.trim().is_empty(), "policy_id is required");
 
-        validate_threshold(
-            "max_cpu_utilization_ratio",
-            self.max_cpu_utilization_ratio,
-        )?;
+        validate_threshold("max_cpu_utilization_ratio", self.max_cpu_utilization_ratio)?;
         validate_threshold(
             "max_memory_utilization_ratio",
             self.max_memory_utilization_ratio,
@@ -171,12 +168,7 @@ pub fn evaluate(
             .iter()
             .any(|id| id == &worker.executor_id);
         compatible_worker_seen |= executor_compatible;
-        evaluations.push(evaluate_worker(
-            plan,
-            worker,
-            policy,
-            executor_compatible,
-        )?);
+        evaluations.push(evaluate_worker(plan, worker, policy, executor_compatible)?);
     }
 
     let admissible_worker_ids = evaluations
@@ -443,9 +435,7 @@ fn validate_threshold(field: &str, value: Option<f64>) -> Result<()> {
 mod tests {
     use super::*;
     use crate::binding::{BINDING_ALGORITHM_VERSION, BINDING_REPORT_SCHEMA_VERSION, ExecutorFit};
-    use crate::execution::{
-        CacheRequirement, EXECUTION_PLAN_SCHEMA_VERSION, ExecutionEnvironment,
-    };
+    use crate::execution::{CacheRequirement, EXECUTION_PLAN_SCHEMA_VERSION, ExecutionEnvironment};
     use crate::model::GIB;
     use crate::worker_state::{WORKER_STATE_SNAPSHOT_SCHEMA_VERSION, WorkerState};
 
@@ -578,7 +568,11 @@ mod tests {
 
         let error = policy.validate().unwrap_err();
 
-        assert!(error.to_string().contains("requires max_cpu_utilization_ratio"));
+        assert!(
+            error
+                .to_string()
+                .contains("requires max_cpu_utilization_ratio")
+        );
     }
 
     #[test]
@@ -589,13 +583,8 @@ mod tests {
         let mut policy = physical_policy();
         policy.cpu_capacity_basis = CapacityBasis::AllocationLimit;
 
-        let report = evaluate(
-            &plan,
-            &binding(&plan),
-            &snapshot(vec![busy]),
-            &policy,
-        )
-        .expect("admission");
+        let report =
+            evaluate(&plan, &binding(&plan), &snapshot(vec![busy]), &policy).expect("admission");
 
         assert_eq!(report.outcome, AdmissionOutcome::Admit);
         assert_eq!(report.workers[0].available_before.cpu_millis, 18_000);
@@ -674,14 +663,9 @@ mod tests {
         .expect("admission");
 
         assert_eq!(report.outcome, AdmissionOutcome::Defer);
-        assert!(
-            report.workers[0]
-                .exclusions
-                .iter()
-                .any(|reason| {
-                    reason.code == AdmissionExclusionCode::ExclusiveCpuEvidenceUnavailable
-                })
-        );
+        assert!(report.workers[0].exclusions.iter().any(|reason| {
+            reason.code == AdmissionExclusionCode::ExclusiveCpuEvidenceUnavailable
+        }));
     }
 
     #[test]
