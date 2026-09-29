@@ -615,6 +615,42 @@ RESERVATIONSTORE1:
 
 Next: EXECUTOR1 - define the reserved-to-starting/running execution ownership transition and connect one real microVM backend in a single control-plane process. Add a Postgres ReservationStore before multi-instance control-plane deployment.
 
+## VS10.11 - Execution ownership and first microVM backend
+
+Status: EXECUTOR1 implemented.
+
+Goal:
+
+```text
+active authoritative lease
+  -> claim execution ownership
+  -> STARTING
+  -> backend create
+  -> RUNNING
+  -> command
+  -> teardown
+  -> SUCCEEDED / FAILED
+```
+
+EXECUTOR1:
+
+- add a provider-neutral ExecutorBackend lifecycle: validate_plan/create/exec/destroy
+- atomically convert reserved resources/count into running allocation during execution claim
+- advance worker state_revision and mark the lease claimed in the same transaction
+- persist one authoritative ExecutionRecord per lease
+- make exact execution-id replay idempotent and conflicting reuse fail closed
+- persist STARTING -> RUNNING with backend resource identity
+- atomically return allocated resources/count on terminal completion
+- capture stdout/stderr/exit code/error/cleanup outcome
+- treat backend cleanup failure as failed execution
+- add BoxdCliBackend using isolated machine create/exec/remove commands
+- preserve argv boundaries instead of shell-joining workload input
+- restrict the initial Boxd proof to exact CPU2-MEM8 shared/shared microVM semantics
+- use a fake Boxd CLI in CI to prove orchestration without claiming a real KVM boot
+- keep crash reconciliation and unknown STARTING/RUNNING recovery out of this slice
+
+Next proof: run `cishape executor-run-boxd` against authenticated Boxd and record the first real isolated KVM command. Then add RECOVERY1 / EXECUTOR2 before general CI routing.
+
 ## VS11 - Controlled routing
 
 Only after advisory recommendations, execution plans, capability binding, and live capacity evidence prove reliable, allow opt-in automation through existing CI control planes.
