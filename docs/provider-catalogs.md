@@ -28,6 +28,7 @@ Every offer records:
 - provider offer ID
 - optional CI runner label
 - optional repository visibility context when the same runner label maps to different capacity/commercial semantics
+- optional required capacity-scope kind when an offer's concurrency semantics are broader than one repository or tied to a provider pool
 - CPU and memory when verified
 - OS and architecture
 - execution model
@@ -86,6 +87,18 @@ CIShape does not invent missing facts.
 An offer with unknown memory, billing increment, or price remains visible in the catalog but is not selected by `catalog-fit`.
 
 This is intentional. Provider coverage and optimization safety are separate concerns.
+
+## Capacity-scope requirements
+
+Runner shape/pricing and concurrency scope are separate provider facts.
+
+An offer may require its runtime capacity evidence to cover a specific scope kind:
+
+- `repository` - evidence covers one repository
+- `provider_account` - evidence covers the provider tenant/account that owns the shared concurrency limit
+- `pool` - evidence covers one configured runner pool
+
+The checked-in GitHub standard hosted-runner offers require `provider_account` capacity evidence because GitHub documents standard runner concurrency as a plan-level total. A repository-only scan cannot prove that account-wide queue/running state, so economics skips those offers until matching evidence exists.
 
 ## Context-specific runner labels
 
