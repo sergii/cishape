@@ -298,7 +298,7 @@ Next after ONBOARD1: release/package boundary, including the unresolved reposito
 
 ## V0.1 release candidate
 
-Status: RELEASE1 in progress.
+Status: RELEASE1 complete.
 
 Goal:
 
@@ -317,6 +317,15 @@ RELEASE1:
 - upload workflow artifact only
 - no tag, GitHub Release, crates.io publish, signing, or deployment
 - keep the unresolved license as an explicit public-publishing blocker
+
+RELEASE1 proof:
+
+- Release Candidate #2 completed successfully from main commit `520426443708b07c6201f5e5fbe7640cf5262672`
+- Linux x86_64 locked release build passed
+- release binary smoke passed
+- archive/checksum/provenance packaging passed
+- workflow artifact uploaded as `cishape-v0.1.0-x86_64-unknown-linux-gnu-rc-36510349471-1`
+- artifact digest recorded by GitHub
 
 Next after RELEASE1: decide the repository license, then define RELEASE2 publication/platform scope.
 
