@@ -113,19 +113,14 @@ pub fn recommend_with_policy(
         .next()?;
 
     let predicted_p95_ms = profile.duration_p95_ms * policy.latency_penalty;
-    let current_rate = catalog
+    let current_cost = catalog
         .iter()
         .find(|entry| entry.shape == profile.current_runner)
-        .map(|entry| entry.usd_per_minute)
-        .unwrap_or(candidate.usd_per_minute);
+        .map(|entry| entry.usd_per_minute * profile.duration_p95_ms / 60_000.0);
 
-    let current_cost = current_rate * profile.duration_p95_ms / 60_000.0;
     let recommended_cost = candidate.estimated_p95_cost_usd;
-    let reduction = if current_cost > 0.0 {
-        (1.0 - recommended_cost / current_cost) * 100.0
-    } else {
-        0.0
-    };
+    let reduction = current_cost
+        .and_then(|cost| (cost > 0.0).then_some((1.0 - recommended_cost / cost) * 100.0));
 
     Some(Recommendation {
         job: profile.job.clone(),
@@ -173,6 +168,31 @@ mod tests {
             RunnerShape::new(2_000, 4 * GIB)
         );
         assert!(recommendation.algorithm.contains("default-v1"));
+    }
+
+    #[test]
+    fn reports_savings_when_current_runner_price_is_known() {
+        let recommendation =
+            recommend(&light_profile(), &default_catalog()).expect("recommendation");
+
+        assert!(recommendation.current_estimated_cost_usd.is_some());
+        assert!(
+            recommendation
+                .cost_reduction_percent
+                .is_some_and(|value| value > 0.0)
+        );
+    }
+
+    #[test]
+    fn leaves_current_cost_unknown_when_current_runner_is_not_in_catalog() {
+        let mut profile = light_profile();
+        profile.current_runner = RunnerShape::new(10_000, 15 * GIB);
+
+        let recommendation = recommend(&profile, &default_catalog()).expect("recommendation");
+
+        assert!(recommendation.current_estimated_cost_usd.is_none());
+        assert!(recommendation.cost_reduction_percent.is_none());
+        assert!(recommendation.recommended_estimated_cost_usd > 0.0);
     }
 
     #[test]

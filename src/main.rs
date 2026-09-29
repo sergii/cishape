@@ -1531,14 +1531,22 @@ fn print_recommendation(recommendation: &Recommendation) {
         "  predicted p95     {:.2}s",
         recommendation.predicted_p95_ms / 1000.0
     );
-    println!(
-        "  estimated cost    ${:.5} -> ${:.5} per p95 run",
-        recommendation.current_estimated_cost_usd, recommendation.recommended_estimated_cost_usd
-    );
-    println!(
-        "  estimated saving  {:.1}%",
-        recommendation.cost_reduction_percent
-    );
+    if let Some(current_cost) = recommendation.current_estimated_cost_usd {
+        println!(
+            "  estimated cost    ${current_cost:.5} -> ${:.5} per p95 run",
+            recommendation.recommended_estimated_cost_usd
+        );
+    } else {
+        println!(
+            "  estimated cost    unknown -> ${:.5} per p95 run",
+            recommendation.recommended_estimated_cost_usd
+        );
+    }
+    if let Some(reduction) = recommendation.cost_reduction_percent {
+        println!("  estimated saving  {reduction:.1}%");
+    } else {
+        println!("  estimated saving  unknown (current runner rate unavailable)");
+    }
     println!("  algorithm         {}", recommendation.algorithm);
 }
 
