@@ -1,4 +1,6 @@
-use crate::catalog::{ExecutionModel, OfferPricing, ProviderCatalog, RunnerOffer};
+use crate::catalog::{
+    ExecutionModel, OfferPricing, ProviderCatalog, RepositoryVisibility, RunnerOffer,
+};
 use crate::model::RunnerShape;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -12,6 +14,8 @@ pub struct CapacitySnapshot {
     pub schema_version: u32,
     pub observed_at: String,
     pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_visibility: Option<RepositoryVisibility>,
     pub states: Vec<CapacityState>,
 }
 
@@ -166,6 +170,8 @@ pub struct EconomicsReport {
     pub schema_version: u32,
     pub snapshot_observed_at: String,
     pub snapshot_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_repository_visibility: Option<RepositoryVisibility>,
     pub target: RunnerShape,
     pub predicted_warm_duration_ms: u64,
     pub evaluations: Vec<EconomicsEvaluation>,
@@ -201,7 +207,13 @@ pub fn evaluate(
             continue;
         };
 
-        match evaluate_offer(offer, state, target, predicted_warm_duration_ms) {
+        match evaluate_offer(
+            offer,
+            state,
+            snapshot.repository_visibility.as_ref(),
+            target,
+            predicted_warm_duration_ms,
+        ) {
             Ok(evaluation) => evaluations.push(evaluation),
             Err(reason) => skipped.push(EconomicsSkip {
                 provider: state.provider.clone(),
@@ -227,6 +239,7 @@ pub fn evaluate(
         schema_version: ECONOMICS_REPORT_SCHEMA_VERSION,
         snapshot_observed_at: snapshot.observed_at.clone(),
         snapshot_source: snapshot.source.clone(),
+        snapshot_repository_visibility: snapshot.repository_visibility.clone(),
         target: target.clone(),
         predicted_warm_duration_ms,
         evaluations,
@@ -237,9 +250,26 @@ pub fn evaluate(
 pub(crate) fn evaluate_offer(
     offer: &RunnerOffer,
     state: &CapacityState,
+    repository_visibility: Option<&RepositoryVisibility>,
     target: &RunnerShape,
     predicted_warm_duration_ms: u64,
 ) -> std::result::Result<EconomicsEvaluation, String> {
+    if let Some(required_visibility) = &offer.repository_visibility {
+        match repository_visibility {
+            Some(actual_visibility) if actual_visibility == required_visibility => {}
+            Some(actual_visibility) => {
+                return Err(format!(
+                    "offer requires {required_visibility} repository visibility but snapshot is {actual_visibility}"
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "offer requires {required_visibility} repository visibility but snapshot repository visibility is unknown"
+                ));
+            }
+        }
+    }
+
     let shape = offer
         .capacity
         .complete_shape()
@@ -361,6 +391,9 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
         "- Snapshot: `{}` from `{}`\n",
         report.snapshot_observed_at, report.snapshot_source
     ));
+    if let Some(visibility) = &report.snapshot_repository_visibility {
+        output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
+    }
     output.push_str(&format!("- Target: `{}`\n", report.target.display_id()));
     output.push_str(&format!(
         "- Predicted warm runtime: {:.2}s\n\n",
@@ -472,8 +505,14 @@ mod tests {
         input.offer_id = "vm".into();
         input.utilization = Some(0.5);
 
-        let evaluation = evaluate_offer(&offer, &input, &RunnerShape::new(2_000, 4 * GIB), 11_000)
-            .expect("evaluation");
+        let evaluation = evaluate_offer(
+            &offer,
+            &input,
+            None,
+            &RunnerShape::new(2_000, 4 * GIB),
+            11_000,
+        )
+        .expect("evaluation");
 
         let expected = 0.016 / (2.0 * 0.5) * 11_000.0 / 3_600_000.0;
         assert!((evaluation.effective_cost_usd - expected).abs() < 1e-12);
