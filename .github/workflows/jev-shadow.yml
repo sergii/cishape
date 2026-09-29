@@ -85,8 +85,8 @@ jobs:
 
           artifact_id="$(
             gh api --paginate --slurp \
-              "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-              --jq '[.[]
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" |
+              jq -r '[.[]
                 | .artifacts[]
                 | select(.expired == false)
                 | select(.name | startswith("cishape-history-"))]
