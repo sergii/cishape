@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub const ADMISSION_POLICY_SCHEMA_VERSION: u32 = 1;
-pub const ADMISSION_REPORT_SCHEMA_VERSION: u32 = 1;
+pub const ADMISSION_REPORT_SCHEMA_VERSION: u32 = 2;
 pub const ADMISSION_ALGORITHM_VERSION: &str = "worker-admission-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,11 +115,14 @@ pub struct AdmissionExclusion {
 pub struct WorkerAdmission {
     pub worker_id: String,
     pub executor_id: String,
+    pub state_revision: u64,
     pub admissible: bool,
     pub available_before: RunnerShape,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub available_after: Option<RunnerShape>,
     pub running_allocations: u32,
+    pub reserved_allocations: u32,
+    pub committed_allocations: u32,
     pub max_allocations: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pressure: Option<WorkerPressure>,
@@ -133,11 +136,100 @@ pub struct AdmissionReport {
     pub policy_id: String,
     pub job: String,
     pub repository: Option<String>,
+    pub plan: ExecutionPlan,
     pub worker_snapshot_observed_at: String,
     pub worker_snapshot_source: String,
     pub outcome: AdmissionOutcome,
     pub admissible_worker_ids: Vec<String>,
     pub workers: Vec<WorkerAdmission>,
+}
+
+impl AdmissionReport {
+    pub fn load(path: &Path) -> Result<Self> {
+        let bytes =
+            std::fs::read(path).with_context(|| format!("read admission report {}", path.display()))?;
+        let report: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse admission report {}", path.display()))?;
+        report.validate()?;
+        Ok(report)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            self.schema_version == ADMISSION_REPORT_SCHEMA_VERSION,
+            "unsupported admission report schema version {}",
+            self.schema_version
+        );
+        anyhow::ensure!(!self.algorithm.trim().is_empty(), "admission algorithm is required");
+        anyhow::ensure!(!self.policy_id.trim().is_empty(), "admission policy_id is required");
+        self.plan.validate()?;
+        anyhow::ensure!(
+            self.job == self.plan.job,
+            "admission job does not match embedded ExecutionPlan"
+        );
+        anyhow::ensure!(
+            self.repository == self.plan.repository,
+            "admission repository does not match embedded ExecutionPlan"
+        );
+
+        let mut worker_ids = std::collections::BTreeSet::new();
+        let mut admissible = Vec::new();
+        for worker in &self.workers {
+            anyhow::ensure!(
+                !worker.worker_id.trim().is_empty(),
+                "admission worker_id is required"
+            );
+            anyhow::ensure!(
+                worker_ids.insert(worker.worker_id.as_str()),
+                "duplicate admission worker_id {}",
+                worker.worker_id
+            );
+            anyhow::ensure!(
+                worker.state_revision > 0,
+                "admission worker {} state_revision must be positive",
+                worker.worker_id
+            );
+            anyhow::ensure!(
+                worker.admissible == worker.exclusions.is_empty(),
+                "admission worker {} admissible flag does not match exclusions",
+                worker.worker_id
+            );
+            if worker.admissible {
+                admissible.push(worker.worker_id.clone());
+            }
+        }
+        admissible.sort();
+        let mut declared = self.admissible_worker_ids.clone();
+        declared.sort();
+        anyhow::ensure!(
+            declared == admissible,
+            "admissible_worker_ids do not match worker admission evidence"
+        );
+        anyhow::ensure!(
+            declared.windows(2).all(|pair| pair[0] != pair[1]),
+            "admissible_worker_ids contain duplicates"
+        );
+
+        let expected_outcome = if !declared.is_empty() {
+            AdmissionOutcome::Admit
+        } else if self
+            .workers
+            .iter()
+            .any(|worker| worker.exclusions.iter().all(|reason| {
+                reason.code != AdmissionExclusionCode::ExecutorNotCompatible
+            }))
+        {
+            AdmissionOutcome::Defer
+        } else {
+            AdmissionOutcome::NoEligibleWorker
+        };
+        anyhow::ensure!(
+            self.outcome == expected_outcome,
+            "admission outcome does not match worker evidence"
+        );
+
+        Ok(())
+    }
 }
 
 pub fn evaluate(
@@ -191,6 +283,7 @@ pub fn evaluate(
         policy_id: policy.policy_id.clone(),
         job: plan.job.clone(),
         repository: plan.repository.clone(),
+        plan: plan.clone(),
         worker_snapshot_observed_at: snapshot.observed_at.clone(),
         worker_snapshot_source: snapshot.source.clone(),
         outcome,
@@ -225,12 +318,13 @@ fn evaluate_worker(
         });
     }
 
-    if worker.running_allocations >= worker.max_allocations {
+    let committed_allocations = worker.committed_allocations()?;
+    if committed_allocations >= worker.max_allocations {
         exclusions.push(AdmissionExclusion {
             code: AdmissionExclusionCode::AllocationCountExhausted,
             detail: format!(
-                "worker has {}/{} running allocations",
-                worker.running_allocations, worker.max_allocations
+                "worker has {}/{} committed running + reserved allocations",
+                committed_allocations, worker.max_allocations
             ),
         });
     }
@@ -242,12 +336,12 @@ fn evaluate_worker(
         });
     }
 
-    if plan.host_tenancy == HostTenancy::Dedicated && worker.running_allocations > 0 {
+    if plan.host_tenancy == HostTenancy::Dedicated && committed_allocations > 0 {
         exclusions.push(AdmissionExclusion {
             code: AdmissionExclusionCode::DedicatedHostOccupied,
             detail: format!(
-                "dedicated-host plan requires an empty worker but {} allocations are running",
-                worker.running_allocations
+                "dedicated-host plan requires an empty worker but {} allocations are committed",
+                committed_allocations
             ),
         });
     }
@@ -309,10 +403,13 @@ fn evaluate_worker(
     Ok(WorkerAdmission {
         worker_id: worker.worker_id.clone(),
         executor_id: worker.executor_id.clone(),
+        state_revision: worker.state_revision,
         admissible: exclusions.is_empty(),
         available_before,
         available_after,
         running_allocations: worker.running_allocations,
+        reserved_allocations: worker.reserved_allocations,
+        committed_allocations,
         max_allocations: worker.max_allocations,
         pressure: worker.pressure.clone(),
         exclusions,
@@ -356,9 +453,10 @@ fn effective_available_capacity(
         }
     };
 
+    let committed = worker.committed_capacity()?;
     Ok(RunnerShape::new(
-        cpu_ceiling.saturating_sub(worker.allocated_capacity.cpu_millis),
-        memory_ceiling.saturating_sub(worker.allocated_capacity.memory_bytes),
+        cpu_ceiling.saturating_sub(committed.cpu_millis),
+        memory_ceiling.saturating_sub(committed.memory_bytes),
     ))
 }
 
@@ -480,11 +578,14 @@ mod tests {
         WorkerState {
             worker_id: id.into(),
             executor_id: "microvm-x86_64".into(),
+            state_revision: 7,
             lifecycle: WorkerLifecycle::Ready,
             physical_capacity: RunnerShape::new(32_000, 128 * GIB),
             allocation_limit: RunnerShape::new(48_000, 120 * GIB),
             allocated_capacity: RunnerShape::new(20_000, 40 * GIB),
+            reserved_capacity: RunnerShape::new(0, 0),
             running_allocations: 6,
+            reserved_allocations: 0,
             max_allocations: 16,
             pressure: Some(WorkerPressure {
                 cpu_utilization_ratio: Some(0.42),
