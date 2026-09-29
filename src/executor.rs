@@ -523,7 +523,12 @@ impl ExecutorBackend for BoxdCliBackend {
     fn exec(&self, handle: &BackendHandle, command: &[String]) -> Result<BackendCommandResult> {
         anyhow::ensure!(!command.is_empty(), "backend command is required");
 
-        let mut args = vec!["machine".into(), "exec".into(), handle.resource_id.clone(), "--".into()];
+        let mut args = vec![
+            "machine".into(),
+            "exec".into(),
+            handle.resource_id.clone(),
+            "--".into(),
+        ];
         args.extend(command.iter().cloned());
         let output = self.run_boxd(&args)?;
 
@@ -632,7 +637,10 @@ mod tests {
         .expect("claim");
 
         assert_eq!(transition.worker_after.state_revision, 9);
-        assert_eq!(transition.worker_after.reserved_capacity, RunnerShape::new(0, 0));
+        assert_eq!(
+            transition.worker_after.reserved_capacity,
+            RunnerShape::new(0, 0)
+        );
         assert_eq!(
             transition.worker_after.allocated_capacity,
             RunnerShape::new(2_000, 8 * GIB)
@@ -682,7 +690,10 @@ mod tests {
             finish_execution(&claim.worker_after, &running, &completion, 2_200).expect("finish");
 
         assert_eq!(finished.execution_after.status, ExecutionStatus::Succeeded);
-        assert_eq!(finished.worker_after.allocated_capacity, RunnerShape::new(0, 0));
+        assert_eq!(
+            finished.worker_after.allocated_capacity,
+            RunnerShape::new(0, 0)
+        );
         assert_eq!(finished.worker_after.running_allocations, 0);
         assert_eq!(finished.worker_after.state_revision, 10);
     }
@@ -761,10 +772,7 @@ mod tests {
         let backend = BoxdCliBackend::with_binary(&binary);
         let handle = backend.create("exec-1", &plan()).expect("create");
         let result = backend
-            .exec(
-                &handle,
-                &["/bin/echo".into(), "hello;not-a-shell".into()],
-            )
+            .exec(&handle, &["/bin/echo".into(), "hello;not-a-shell".into()])
             .expect("exec");
         backend.destroy(&handle).expect("destroy");
 
