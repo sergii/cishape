@@ -404,7 +404,7 @@ RELEASE3:
 
 ## V0.1.2 cost-evidence patch
 
-Status: RELEASE4 in progress.
+Status: RELEASE4 complete.
 
 Manual acceptance of v0.1.1 exposed a fail-open cost-reporting path when the observed current runner shape was not present in the internal candidate catalog.
 
@@ -416,6 +416,18 @@ RELEASE4:
 - regression-test both known-current and unknown-current pricing paths
 - remove the stale duplicate README license warning
 - publish a new `v0.1.2` tag/release without mutating earlier releases
+
+
+RELEASE4 proof:
+
+- public tag: `v0.1.2`
+- source commit: `8d71422910b8d9cd90ca6f04dfdd20b41526d135`
+- targeted unknown-current-cost regression test: success
+- dependency-license audit: success
+- extracted standalone package acceptance: success
+- payload re-verification: success
+- GitHub Release publication: success
+- v0.1.0 and v0.1.1 remain unchanged
 
 ## VS9 - Cloud ingest
 
