@@ -426,14 +426,20 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
         report.predicted_warm_duration_ms as f64 / 1000.0
     ));
 
-    output.push_str("| Provider | Offer | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
-    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
+    output.push_str("| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
 
     for evaluation in &report.evaluations {
+        let scope = evaluation
+            .capacity_scope
+            .as_ref()
+            .map(|scope| format!("{}:{}", scope.kind, scope.key))
+            .unwrap_or_else(|| "-".into());
         output.push_str(&format!(
-            "| {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            scope,
             evaluation.cache_state,
             evaluation.queue_depth,
             evaluation.running_jobs,
