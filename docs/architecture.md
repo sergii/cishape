@@ -167,6 +167,21 @@ The Rust state machine and CLI are deterministic proofs, not a distributed stora
 
 See `docs/reservation.md`.
 
+
+### Authoritative reservation storage
+
+RESERVATIONSTORE1 adds a `ReservationStore` boundary and a DuckDB implementation for one authoritative writer process.
+
+The reservation database is separate from CIShape's analytical history database. It stores canonical WorkerState/ReservationLease JSON plus indexed identity, revision, status, and expiry fields used for CAS and lookup.
+
+Reserve, release, and expire transitions are persisted in database transactions. Successful reservation updates the worker using `worker_id + expected state_revision`, inserts the lease, and commits as one unit.
+
+The adapter validates indexed fields against canonical domain JSON on read and fails closed on disagreement.
+
+This DuckDB adapter is not a multi-instance control-plane database. It is sufficient for a single-process executor proof. Horizontal control-plane deployment requires another `ReservationStore` implementation, expected to be Postgres-class storage with cross-client transactional tests.
+
+See `docs/reservation-store.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.
