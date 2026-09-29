@@ -61,6 +61,14 @@ jobs:
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "package=${package}" >> "${GITHUB_OUTPUT}"
 
+      - name: Resolve release dependency lock
+        id: lock
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
+          echo "sha256=${lock_sha256}" >> "${GITHUB_OUTPUT}"
+
       - name: Restore Rust build cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -89,6 +97,7 @@ jobs:
           cp target/release/cishape "dist/${PACKAGE}/cishape"
           cp README.md "dist/${PACKAGE}/README.md"
           cp docs/quickstart.md "dist/${PACKAGE}/QUICKSTART.md"
+          cp Cargo.lock "dist/${PACKAGE}/Cargo.lock"
 
           tar -C dist -czf "dist/${PACKAGE}.tar.gz" "${PACKAGE}"
           sha256sum "dist/${PACKAGE}.tar.gz" > "dist/${PACKAGE}.tar.gz.sha256"
@@ -105,6 +114,7 @@ jobs:
             --arg workflow_run_attempt "${GITHUB_RUN_ATTEMPT}" \
             --arg archive "${PACKAGE}.tar.gz" \
             --arg archive_sha256 "${archive_sha256}" \
+            --arg lockfile_sha256 "${{ steps.lock.outputs.sha256 }}" \
             '{
               schema_version: ($schema_version | tonumber),
               product: $product,
@@ -115,7 +125,8 @@ jobs:
               workflow_run_id: $workflow_run_id,
               workflow_run_attempt: ($workflow_run_attempt | tonumber),
               archive: $archive,
-              archive_sha256: $archive_sha256
+              archive_sha256: $archive_sha256,
+              lockfile_sha256: $lockfile_sha256
             }' > "dist/${PACKAGE}.manifest.json"
 
           echo "archive=dist/${PACKAGE}.tar.gz" >> "${GITHUB_OUTPUT}"
@@ -136,6 +147,7 @@ jobs:
             echo "| Commit | \`${GITHUB_SHA}\` |"
             echo "| Target | \`${TARGET}\` |"
             echo "| Archive | \`${PACKAGE}.tar.gz\` |"
+            echo "| Cargo.lock SHA-256 | \`${{ steps.lock.outputs.sha256 }}\` |"
             echo "| Published | no |"
             echo
             echo "This workflow only builds and uploads an internal workflow artifact. It does not create a tag, GitHub Release, crates.io publish, or deployment."
