@@ -445,6 +445,29 @@ Cloudflare is a possible hosting platform, not part of the core product identity
 
 Emit suggestions for existing CI systems without changing workflows automatically.
 
+## VS10.5 - Advisory execution planning
+
+Status: EXECUTION1 implemented.
+
+Goal:
+
+```text
+JobShape
+  -> deterministic RunnerShape recommendation
+  + explicit ExecutionRequirements
+  -> provider-neutral ExecutionPlan
+```
+
+EXECUTION1:
+
+- keep CIShape side-effect free and outside the CI control-plane role
+- derive target CPU/RAM from the existing deterministic sizing path
+- require explicit trust/isolation/tenancy/cache/concurrency/placement requirements rather than inferring them from job names
+- model execution environment separately from CPU/host tenancy
+- escalate untrusted code to a guest-kernel boundary in planner v1
+- emit portable deterministic JSON for a future external scheduler/executor
+- defer Firecracker, boxd, Kubernetes, provider binding, runner registration, provisioning, and automatic routing
+
 ## VS11 - Controlled routing
 
-Only after advisory recommendations prove reliable, allow opt-in automation through existing CI control planes.
+Only after advisory recommendations and execution plans prove reliable, allow opt-in automation through existing CI control planes.
