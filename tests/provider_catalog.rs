@@ -1,4 +1,4 @@
-use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
+use cishape::catalog::{CapacityScopeKind, ProviderCatalog, RepositoryVisibility};
 use cishape::model::{GIB, RunnerShape};
 use std::path::PathBuf;
 
@@ -51,6 +51,16 @@ fn github_standard_runner_context_changes_shape_and_cost() {
         .expect("public standard GitHub fit");
     assert_eq!(public_standard.shape, RunnerShape::new(4_000, 16 * GIB));
     assert_eq!(public_standard.estimated_cost_usd, 0.0);
+
+    let public_offer = catalog
+        .offers
+        .iter()
+        .find(|offer| offer.offer_id == "ubuntu-latest-public-x64")
+        .expect("public standard offer");
+    assert_eq!(
+        public_offer.required_capacity_scope,
+        Some(CapacityScopeKind::ProviderAccount)
+    );
 
     assert!(
         private
