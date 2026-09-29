@@ -85,7 +85,9 @@ fn workflow_skips_offer_when_concurrency_scope_is_too_narrow() {
     );
     assert!(report.skipped.iter().any(|item| {
         item.offer_id == "ubuntu-latest-public-x64"
-            && item.reason.contains("requires provider_account capacity scope")
+            && item
+                .reason
+                .contains("requires provider_account capacity scope")
     }));
 }
 
