@@ -347,7 +347,7 @@ Next after LICENSE1: RELEASE2 - rebuild a licensed release candidate, verify its
 
 ## V0.1 public release
 
-Status: RELEASE2 in progress.
+Status: RELEASE2 complete.
 
 Goal:
 
@@ -369,6 +369,21 @@ RELEASE2:
 - publish only `v0.1.0` from an exact main commit
 - attach archive/checksum/provenance to GitHub Release
 - do not publish crates.io or claim additional platform support in this slice
+
+
+RELEASE2 proof:
+
+- public tag: `v0.1.0`
+- source commit: `3cdb07420fa1060835b7fd1553cf1b3e57a7e3cc`
+- Publish v0.1.0 workflow: success
+- dependency-license audit: success
+- release payload verification: success
+- GitHub Release: published
+- attached Linux x86_64 archive, SHA-256 checksum, and provenance manifest
+- archive includes `LICENSE`, `THIRD_PARTY_LICENSES.html`, `README.md`, `QUICKSTART.md`, and exact generated `Cargo.lock`
+- crates.io publication: intentionally not part of v0.1.0
+
+CIShape v0.1.0 is the completed OSS/local-first milestone. Further cloud ingest, wider provider coverage, platform packaging, and controlled routing are post-v0.1 work.
 
 ## VS9 - Cloud ingest
 
