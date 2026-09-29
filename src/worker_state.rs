@@ -93,19 +93,20 @@ impl WorkerState {
         Ok(())
     }
 
-    pub fn available_capacity(&self) -> RunnerShape {
-        RunnerShape::new(
+    pub fn available_capacity(&self) -> Result<RunnerShape> {
+        self.validate()?;
+        Ok(RunnerShape::new(
             self.allocation_limit.cpu_millis - self.allocated_capacity.cpu_millis,
             self.allocation_limit.memory_bytes - self.allocated_capacity.memory_bytes,
-        )
+        ))
     }
 
-    pub fn accepting_new_work(&self) -> bool {
-        let available = self.available_capacity();
-        self.lifecycle == WorkerLifecycle::Ready
+    pub fn accepting_new_work(&self) -> Result<bool> {
+        let available = self.available_capacity()?;
+        Ok(self.lifecycle == WorkerLifecycle::Ready
             && self.running_allocations < self.max_allocations
             && available.cpu_millis > 0
-            && available.memory_bytes > 0
+            && available.memory_bytes > 0)
     }
 }
 
@@ -155,33 +156,34 @@ impl WorkerStateSnapshot {
         Ok(())
     }
 
-    pub fn report(&self) -> WorkerStateReport {
-        let mut workers = self
-            .workers
-            .iter()
-            .map(|worker| WorkerStateSummary {
+    pub fn report(&self) -> Result<WorkerStateReport> {
+        self.validate()?;
+
+        let mut workers = Vec::with_capacity(self.workers.len());
+        for worker in &self.workers {
+            workers.push(WorkerStateSummary {
                 worker_id: worker.worker_id.clone(),
                 executor_id: worker.executor_id.clone(),
                 lifecycle: worker.lifecycle.clone(),
                 physical_capacity: worker.physical_capacity.clone(),
                 allocation_limit: worker.allocation_limit.clone(),
                 allocated_capacity: worker.allocated_capacity.clone(),
-                available_capacity: worker.available_capacity(),
+                available_capacity: worker.available_capacity()?,
                 running_allocations: worker.running_allocations,
                 max_allocations: worker.max_allocations,
-                accepting_new_work: worker.accepting_new_work(),
+                accepting_new_work: worker.accepting_new_work()?,
                 pressure: worker.pressure.clone(),
-            })
-            .collect::<Vec<_>>();
+            });
+        }
 
         workers.sort_by(|left, right| left.worker_id.cmp(&right.worker_id));
 
-        WorkerStateReport {
+        Ok(WorkerStateReport {
             schema_version: WORKER_STATE_REPORT_SCHEMA_VERSION,
             snapshot_observed_at: self.observed_at.clone(),
             snapshot_source: self.source.clone(),
             workers,
-        }
+        })
     }
 }
 
@@ -253,10 +255,10 @@ mod tests {
         let worker = ready_worker("worker-a");
 
         assert_eq!(
-            worker.available_capacity(),
+            worker.available_capacity().expect("available capacity"),
             RunnerShape::new(28_000, 80 * GIB)
         );
-        assert!(worker.accepting_new_work());
+        assert!(worker.accepting_new_work().expect("accepting state"));
     }
 
     #[test]
@@ -272,7 +274,7 @@ mod tests {
         let mut worker = ready_worker("worker-a");
         worker.lifecycle = WorkerLifecycle::Draining;
 
-        assert!(!worker.accepting_new_work());
+        assert!(!worker.accepting_new_work().expect("accepting state"));
     }
 
     #[test]
@@ -303,7 +305,7 @@ mod tests {
         };
 
         snapshot.validate().expect("snapshot");
-        let report = snapshot.report();
+        let report = snapshot.report().expect("report");
 
         assert_eq!(report.workers[0].worker_id, "worker-a");
         assert_eq!(report.workers[1].worker_id, "worker-z");
