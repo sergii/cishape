@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::{ProviderCatalog, RepositoryVisibility};
 use crate::economics::{CapacitySnapshot, CapacityState, evaluate_offer};
 use crate::model::RunnerShape;
@@ -130,6 +131,8 @@ pub struct WorkflowJobSchedule {
 pub struct WorkflowEconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub offer_shape: RunnerShape,
     pub queue_depth: u32,
     pub running_jobs: u32,
@@ -361,6 +364,7 @@ fn schedule(
     Ok(WorkflowEconomicsEvaluation {
         provider: String::new(),
         offer_id: String::new(),
+        capacity_scope: state.capacity_scope.clone(),
         offer_shape: RunnerShape::new(1, 1),
         queue_depth: state.queue_depth,
         running_jobs: state.running_jobs,
