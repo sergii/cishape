@@ -1828,8 +1828,7 @@ fn executor_run_boxd_command(
                 error: Some(format!("backend create failed: {error:#}")),
                 cleanup: CleanupStatus::NotAttempted,
             };
-            let failed =
-                store.finish_execution(execution_id, &completion, unix_time_ms()?)?;
+            let failed = store.finish_execution(execution_id, &completion, unix_time_ms()?)?;
             write_execution_record(&failed, output)?;
             anyhow::bail!("execution {execution_id} failed during backend create");
         }
@@ -1870,12 +1869,7 @@ fn executor_run_boxd_command(
     let cleanup_result = backend.destroy(&handle);
 
     let (exit_code, stdout, stderr, mut error) = match command_result {
-        Ok(result) => (
-            Some(result.exit_code),
-            result.stdout,
-            result.stderr,
-            None,
-        ),
+        Ok(result) => (Some(result.exit_code), result.stdout, result.stderr, None),
         Err(error) => (
             None,
             String::new(),
