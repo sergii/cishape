@@ -543,6 +543,7 @@ mod tests {
             execution_model: ExecutionModel::ManagedEphemeral,
             offer_shape: RunnerShape::new(2_000, 4 * GIB),
             cache_state: CacheState::Warm,
+            scope: None,
             base_duration_ms: 10_000,
             cache_penalty_ms: 0,
             effective_runtime_ms: 10_000,
