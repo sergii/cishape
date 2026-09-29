@@ -16,6 +16,7 @@ use cishape::economics_policy::{
     select_workflow as select_workflow_economics, to_markdown as economics_decision_to_markdown,
     workflow_decision_to_markdown,
 };
+use cishape::execution::{ExecutionRequirements, plan as plan_execution};
 use cishape::github_capacity::{
     DEFAULT_GITHUB_API_BASE, GitHubCapacityClient, GitHubCapacityConfig, GitHubCapacityPlan,
 };
@@ -380,6 +381,20 @@ enum Command {
         policy: PathBuf,
         job: String,
     },
+    /// Build a provider-neutral advisory ExecutionPlan without executing or routing CI.
+    ExecutionPlan {
+        #[arg(long, default_value = ".cishape/cishape.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long, default_value = "policies/default-v1.json")]
+        policy: PathBuf,
+        #[arg(long)]
+        requirements: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        job: String,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -623,6 +638,21 @@ fn main() -> Result<()> {
             print_recommendation(&recommendation);
             Ok(())
         }
+        Command::ExecutionPlan {
+            db,
+            repository,
+            policy,
+            requirements,
+            output,
+            job,
+        } => execution_plan_command(
+            &db,
+            repository.as_deref(),
+            &job,
+            &policy,
+            &requirements,
+            output.as_deref(),
+        ),
         Command::Explain {
             db,
             repository,
@@ -1259,6 +1289,35 @@ fn report_command(db: &Path, repository: Option<&str>, format: ReportFormat) -> 
                 );
             }
         }
+    }
+
+    Ok(())
+}
+
+fn execution_plan_command(
+    db: &Path,
+    repository: Option<&str>,
+    job: &str,
+    policy_path: &Path,
+    requirements_path: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
+    let policy = OptimizationPolicy::load(policy_path)?;
+    let requirements = ExecutionRequirements::load(requirements_path)?;
+    let store = Store::open(db)?;
+    let profile = store.profile_for(job, repository)?;
+    let recommendation = recommend_with_policy(&profile, &default_catalog(), &policy)
+        .with_context(|| format!("no deterministic recommendation for {job}"))?;
+    let plan = plan_execution(&profile, &recommendation, &requirements)?;
+    let payload = serde_json::to_string_pretty(&plan).context("serialize ExecutionPlan")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote execution plan to {}", path.display());
+    } else {
+        println!("{payload}");
     }
 
     Ok(())
