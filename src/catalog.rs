@@ -128,6 +128,24 @@ impl std::fmt::Display for RepositoryVisibility {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum CapacityScopeKind {
+    Repository,
+    ProviderAccount,
+    Pool,
+}
+
+impl std::fmt::Display for CapacityScopeKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Repository => write!(formatter, "repository"),
+            Self::ProviderAccount => write!(formatter, "provider_account"),
+            Self::Pool => write!(formatter, "pool"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecutionModel {
     ManagedEphemeral,
     ManagedConfigurable,
@@ -192,6 +210,8 @@ pub struct RunnerOffer {
     pub execution_model: ExecutionModel,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_visibility: Option<RepositoryVisibility>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_capacity_scope: Option<CapacityScopeKind>,
     pub pricing: OfferPricing,
     pub source_url: String,
     pub observed_at: String,
@@ -333,6 +353,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::ManagedEphemeral,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::PerMinute {
                 usd_per_minute,
                 billing_increment_seconds,
@@ -402,6 +423,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: Some(9.99),
