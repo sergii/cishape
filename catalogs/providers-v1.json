@@ -22,7 +22,8 @@
       },
       "source_url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
       "observed_at": "2026-09-29",
-      "notes": "Context-specific standard GitHub-hosted Ubuntu offer for public repositories; GitHub documents 4 CPU / 16 GB for ubuntu-latest in public repositories."
+      "notes": "Context-specific standard GitHub-hosted Ubuntu offer for public repositories; GitHub documents 4 CPU / 16 GB for ubuntu-latest in public repositories.",
+      "required_capacity_scope": "provider_account"
     },
     {
       "provider": "github-actions",
@@ -44,7 +45,8 @@
       "source_url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
       "observed_at": "2026-09-29",
       "notes": "Context-specific standard GitHub-hosted Ubuntu offer for private repositories.",
-      "repository_visibility": "private"
+      "repository_visibility": "private",
+      "required_capacity_scope": "provider_account"
     },
     {
       "provider": "github-actions",

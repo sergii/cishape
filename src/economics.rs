@@ -1,5 +1,6 @@
 use crate::catalog::{
-    ExecutionModel, OfferPricing, ProviderCatalog, RepositoryVisibility, RunnerOffer,
+    CapacityScopeKind, ExecutionModel, OfferPricing, ProviderCatalog, RepositoryVisibility,
+    RunnerOffer,
 };
 use crate::model::RunnerShape;
 use anyhow::{Context, Result};
@@ -74,6 +75,25 @@ impl std::fmt::Display for CacheState {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CapacityScope {
+    pub kind: CapacityScopeKind,
+    pub key: String,
+}
+
+impl CapacityScope {
+    fn validate(&self) -> Result<()> {
+        anyhow::ensure!(!self.key.trim().is_empty(), "capacity scope key is required");
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for CapacityScope {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}:{}", self.kind, self.key)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityState {
     pub provider: String,
@@ -84,6 +104,8 @@ pub struct CapacityState {
     pub slot_turnover_ms: u64,
     pub cache_state: CacheState,
     pub cache_penalty_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<CapacityScope>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub utilization: Option<f64>,
 }
@@ -101,6 +123,9 @@ impl CapacityState {
             self.slot_turnover_ms > 0,
             "slot_turnover_ms must be positive"
         );
+        if let Some(scope) = &self.scope {
+            scope.validate()?;
+        }
         if self.cache_state == CacheState::Warm {
             anyhow::ensure!(
                 self.cache_penalty_ms == 0,
@@ -140,6 +165,8 @@ pub struct EconomicsEvaluation {
     pub execution_model: ExecutionModel,
     pub offer_shape: RunnerShape,
     pub cache_state: CacheState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<CapacityScope>,
     pub base_duration_ms: u64,
     pub cache_penalty_ms: u64,
     pub effective_runtime_ms: u64,
@@ -270,6 +297,23 @@ pub(crate) fn evaluate_offer(
         }
     }
 
+    if let Some(required_scope) = &offer.required_capacity_scope {
+        match &state.scope {
+            Some(actual_scope) if &actual_scope.kind == required_scope => {}
+            Some(actual_scope) => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state is {}",
+                    actual_scope.kind
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state scope is unknown"
+                ));
+            }
+        }
+    }
+
     let shape = offer
         .capacity
         .complete_shape()
@@ -336,6 +380,7 @@ pub(crate) fn evaluate_offer(
         execution_model: offer.execution_model.clone(),
         offer_shape: shape,
         cache_state: state.cache_state.clone(),
+        scope: state.scope.clone(),
         base_duration_ms: predicted_warm_duration_ms,
         cache_penalty_ms: state.cache_penalty_ms,
         effective_runtime_ms,
@@ -400,14 +445,19 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
         report.predicted_warm_duration_ms as f64 / 1000.0
     ));
 
-    output.push_str("| Provider | Offer | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
-    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
+    output.push_str("| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
 
     for evaluation in &report.evaluations {
         output.push_str(&format!(
-            "| {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            evaluation
+                .scope
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "-".into()),
             evaluation.cache_state,
             evaluation.queue_depth,
             evaluation.running_jobs,
@@ -454,6 +504,7 @@ mod tests {
             slot_turnover_ms: 10_000,
             cache_state: CacheState::Warm,
             cache_penalty_ms: 0,
+            scope: None,
             utilization: None,
         }
     }
@@ -471,6 +522,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: None,

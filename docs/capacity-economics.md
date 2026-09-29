@@ -50,10 +50,30 @@ A snapshot contains one state per provider offer:
 - `cache_state` - `warm` or `cold`
 - `cache_penalty_ms` - explicit extra runtime for a cold cache
 - `utilization` - productive historical slot utilization, required for fixed servers
+- optional `scope` - the boundary covered by queue/running/concurrency evidence, such as repository, provider account, or runner pool
 
 The checked-in `examples/capacity-snapshot-v1.json` is synthetic. It exists to make the model reproducible, not to claim current provider queue conditions.
 
 CATALOG3 adds optional `repository_visibility` to the snapshot. Generic provider offers remain valid without it. Context-specific offers such as GitHub's public/private standard `ubuntu-latest` offers require a matching snapshot visibility and are skipped when the context is missing or mismatched. This prevents a valid queue observation from being combined with the wrong capacity/commercial contract.
+
+## Capacity evidence scope
+
+Queue depth, running jobs, and parallel slots must describe the same capacity domain.
+
+A `CapacityState` can therefore carry:
+
+```json
+{
+  "scope": {
+    "kind": "provider_account",
+    "key": "example-account"
+  }
+}
+```
+
+If a ProviderCatalog offer declares a required capacity-scope kind, economics checks it before doing queue or cost math. Missing or mismatched scope skips the offer with an explicit reason.
+
+This prevents a repository-local active-job scan from being combined with an account-wide concurrency limit as if both described the same pool.
 
 ## Queue model
 

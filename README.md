@@ -196,6 +196,8 @@ cargo run -- capacity-github \
 
 Queue depth and running-job counts come from the GitHub Actions API. The runner provider is explicit because GitHub Actions can execute GitHub-hosted, Depot, or self-hosted jobs. Concurrency capacity, turnover, and cache behavior stay explicit inputs when the control-plane API does not expose those facts for the selected pool.
 
+CAPACITY9 makes the scope of those capacity facts explicit. The current GitHub adapter scans one repository, so every emitted pool state is marked `repository:<owner/repo>`. Offers whose documented concurrency is shared at a broader provider-account level are rejected until matching account-scoped evidence is available. CIShape does not combine a repo-local active-job count with an account-wide concurrency limit.
+
 CAPACITY6 adds a versioned multi-pool plan so one live observation can compare several runner providers/offers:
 
 ```bash

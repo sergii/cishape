@@ -1,5 +1,5 @@
-use crate::catalog::RepositoryVisibility;
-use crate::economics::{CacheState, CapacitySnapshot, CapacityState};
+use crate::catalog::{CapacityScopeKind, RepositoryVisibility};
+use crate::economics::{CacheState, CapacityScope, CapacitySnapshot, CapacityState};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -201,6 +201,10 @@ impl GitHubCapacityClient {
                 slot_turnover_ms: pool.slot_turnover_ms,
                 cache_state: pool.cache_state.clone(),
                 cache_penalty_ms: pool.cache_penalty_ms,
+                scope: Some(CapacityScope {
+                    kind: CapacityScopeKind::Repository,
+                    key: repository.into(),
+                }),
                 utilization: None,
             })
             .collect();
@@ -540,6 +544,10 @@ mod tests {
         assert_eq!(state.running_jobs, 1);
         assert_eq!(state.parallel_slots, 4);
         assert_eq!(state.slot_turnover_ms, 12_000);
+        assert_eq!(
+            state.scope.as_ref().map(|scope| (&scope.kind, scope.key.as_str())),
+            Some((&CapacityScopeKind::Repository, "owner/repo"))
+        );
         assert_eq!(
             snapshot.repository_visibility,
             Some(RepositoryVisibility::Private)
