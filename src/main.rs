@@ -699,7 +699,7 @@ fn catalog_command(path: &Path) -> Result<()> {
         catalog.schema_version, catalog.observed_at
     );
     println!();
-    println!("provider\toffer\tcapacity\texecution\trepository\tpricing");
+    println!("provider\toffer\tcapacity\texecution\trepository\tcapacity-scope\tpricing");
 
     for offer in catalog.offers {
         let repository = offer
@@ -707,13 +707,19 @@ fn catalog_command(path: &Path) -> Result<()> {
             .as_ref()
             .map(ToString::to_string)
             .unwrap_or_else(|| "any".into());
+        let capacity_scope = offer
+            .required_capacity_scope
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "any".into());
         println!(
-            "{}\t{}\t{}\t{:?}\t{}\t{}",
+            "{}\t{}\t{}\t{:?}\t{}\t{}\t{}",
             offer.provider,
             offer.offer_id,
             offer.capacity.display(),
             offer.execution_model,
             repository,
+            capacity_scope,
             offer.pricing.display()
         );
     }
