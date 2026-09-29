@@ -62,6 +62,12 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - Admission capacity basis, reserves, and pressure thresholds must come from versioned policy data. Do not silently treat allocation limits above physical capacity as usable oversubscription.
 - An admission result is advisory snapshot-time eligibility, not a reservation. Never start execution from admission evidence without a later atomic reservation/lease step that prevents double allocation.
 - Exclusive CPU admission must fail closed until worker evidence can prove reservable exclusive cores; free aggregate CPU millis are insufficient.
+- WorkerState must distinguish running allocation from reserved-but-not-started allocation; availability and allocation-count ceilings include both.
+- Worker state_revision is the CAS token for admission-relevant state. Any lifecycle/capacity/allocation/reservation/pressure change used by admission must advance it.
+- Reservation resource amounts come from the exact admitted ExecutionPlan, never caller-supplied CPU/RAM fields.
+- Reservation request IDs are idempotency keys. Exact replay must not double-reserve; conflicting reuse must fail closed.
+- The reservation state machine is not a distributed transaction by itself. A production adapter must atomically compare revision, mutate reserved capacity/count, advance revision, and insert the lease.
+- Lease release/expiry returns only reserved resources and must leave terminal lease evidence instead of deleting idempotency history.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence
