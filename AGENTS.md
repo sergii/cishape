@@ -72,6 +72,13 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - The first DuckDB ReservationStore is single-authority/single-writer-process only. Do not present a shared DuckDB file as a horizontally scaled control-plane database.
 - ReservationStore reads must validate canonical domain JSON against indexed CAS/identity fields and fail closed on disagreement.
 - Initial worker seeding is idempotent only for identical state. It must never overwrite a worker whose authoritative reservation state has changed.
+- Claiming execution must atomically convert one active lease from reserved resources to running allocation, mark the lease claimed, advance worker revision, and insert the STARTING execution record.
+- Claimed leases are terminal for reservation release/expiry. Running resources return only through execution completion to prevent double-free accounting.
+- Validate backend capability before claiming a lease. Do not consume authoritative capacity and then discover the backend cannot represent the plan.
+- Executor commands must preserve argv boundaries. Do not join untrusted workload arguments into a host shell command.
+- Backend teardown is part of execution correctness. A cleanup failure must remain visible and cannot be reported as successful execution.
+- The Boxd EXECUTOR1 adapter supports only the explicitly configured exact public proof shape; never infer arbitrary RunnerShape mappings from provider defaults.
+- Do not automatically replay unknown STARTING/RUNNING executions after a control-plane crash until an explicit reconciliation protocol exists.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence
