@@ -1,5 +1,6 @@
 pub mod advisory;
 pub mod batch;
+pub mod capacity_scope;
 pub mod catalog;
 pub mod decision;
 pub mod economics;

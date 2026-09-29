@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::RepositoryVisibility;
 use crate::economics::{CapacitySnapshot, EconomicsReport};
 use crate::model::RunnerShape;
@@ -10,6 +11,8 @@ pub const BATCH_ECONOMICS_REPORT_SCHEMA_VERSION: u32 = 1;
 pub struct BatchEconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub offer_shape: RunnerShape,
     pub parallel_jobs: u32,
     pub effective_runtime_ms: u64,
@@ -69,6 +72,7 @@ pub fn evaluate(
         evaluations.push(BatchEconomicsEvaluation {
             provider: base.provider.clone(),
             offer_id: base.offer_id.clone(),
+            capacity_scope: base.capacity_scope.clone(),
             offer_shape: base.offer_shape.clone(),
             parallel_jobs,
             effective_runtime_ms: base.effective_runtime_ms,
@@ -200,14 +204,20 @@ pub fn to_markdown(report: &BatchEconomicsReport) -> String {
         output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
     }
     output.push_str(&format!("- Jobs: {}\n\n", report.parallel_jobs));
-    output.push_str("| Provider | Offer | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
-    output.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
+        let scope = evaluation
+            .capacity_scope
+            .as_ref()
+            .map(|scope| format!("{}:{}", scope.kind, scope.key))
+            .unwrap_or_else(|| "-".into());
         output.push_str(&format!(
-            "| {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
+            "| {} | {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            scope,
             evaluation.parallel_jobs,
             evaluation.first_job_start_ms as f64 / 1000.0,
             evaluation.last_job_start_ms as f64 / 1000.0,

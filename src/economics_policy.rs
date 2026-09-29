@@ -540,6 +540,7 @@ mod tests {
         EconomicsEvaluation {
             provider: provider.into(),
             offer_id: "offer".into(),
+            capacity_scope: None,
             execution_model: ExecutionModel::ManagedEphemeral,
             offer_shape: RunnerShape::new(2_000, 4 * GIB),
             cache_state: CacheState::Warm,

@@ -1,3 +1,4 @@
+use cishape::capacity_scope::CapacityScopeKind;
 use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::model::{GIB, RunnerShape};
 use std::path::PathBuf;
@@ -35,6 +36,23 @@ fn checked_in_provider_catalog_validates() {
             .iter()
             .any(|offer| offer.provider == "hetzner")
     );
+}
+
+#[test]
+fn github_standard_runners_require_provider_account_capacity_scope() {
+    let catalog = ProviderCatalog::load(&catalog_path()).expect("catalog");
+
+    for offer_id in ["ubuntu-latest-public-x64", "ubuntu-latest-private-x64"] {
+        let offer = catalog
+            .offers
+            .iter()
+            .find(|offer| offer.offer_id == offer_id)
+            .expect("GitHub standard offer");
+        assert_eq!(
+            offer.required_capacity_scope,
+            Some(CapacityScopeKind::ProviderAccount)
+        );
+    }
 }
 
 #[test]

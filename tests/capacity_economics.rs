@@ -1,3 +1,4 @@
+use cishape::capacity_scope::{CapacityScope, CapacityScopeKind};
 use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::economics::{CapacitySnapshot, CostBasis, evaluate};
 use cishape::model::{GIB, RunnerShape};
@@ -58,6 +59,64 @@ fn deterministic_fixture_compares_managed_and_persistent_capacity() {
     assert_eq!(hetzner.cost_basis, CostBasis::AllocatedFixedCapacity);
     assert!(hetzner.effective_cost_usd < depot.effective_cost_usd);
     assert!(hetzner.pareto_optimal);
+}
+
+#[test]
+fn account_scoped_offer_rejects_repository_scoped_concurrency_evidence() {
+    let catalog =
+        ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("provider catalog");
+    let mut snapshot = CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
+        .expect("capacity snapshot");
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.capacity_scope = Some(CapacityScope {
+        kind: CapacityScopeKind::Repository,
+        key: "sergii/cishape".into(),
+    });
+
+    let report = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("economics report");
+
+    assert!(
+        report
+            .evaluations
+            .iter()
+            .all(|item| item.offer_id != "ubuntu-latest-private-x64")
+    );
+    assert!(report.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-private-x64"
+            && item
+                .reason
+                .contains("requires provider_account capacity scope")
+            && item.reason.contains("repository")
+    }));
+
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.capacity_scope = None;
+
+    let unknown = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("unknown-scope economics");
+    assert!(unknown.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-private-x64"
+            && item.reason.contains("snapshot state scope is unknown")
+    }));
 }
 
 #[test]

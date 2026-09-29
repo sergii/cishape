@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::{
     ExecutionModel, OfferPricing, ProviderCatalog, RepositoryVisibility, RunnerOffer,
 };
@@ -78,6 +79,8 @@ impl std::fmt::Display for CacheState {
 pub struct CapacityState {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub queue_depth: u32,
     pub running_jobs: u32,
     pub parallel_slots: u32,
@@ -92,6 +95,9 @@ impl CapacityState {
     fn validate(&self) -> Result<()> {
         anyhow::ensure!(!self.provider.trim().is_empty(), "provider is required");
         anyhow::ensure!(!self.offer_id.trim().is_empty(), "offer_id is required");
+        if let Some(scope) = &self.capacity_scope {
+            scope.validate()?;
+        }
         anyhow::ensure!(self.parallel_slots > 0, "parallel_slots must be positive");
         anyhow::ensure!(
             self.running_jobs <= self.parallel_slots,
@@ -137,6 +143,8 @@ impl std::fmt::Display for CostBasis {
 pub struct EconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub execution_model: ExecutionModel,
     pub offer_shape: RunnerShape,
     pub cache_state: CacheState,
@@ -270,6 +278,23 @@ pub(crate) fn evaluate_offer(
         }
     }
 
+    if let Some(required_scope) = &offer.required_capacity_scope {
+        match &state.capacity_scope {
+            Some(actual_scope) if &actual_scope.kind == required_scope => {}
+            Some(actual_scope) => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state is {} ({})",
+                    actual_scope.kind, actual_scope.key
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state scope is unknown"
+                ));
+            }
+        }
+    }
+
     let shape = offer
         .capacity
         .complete_shape()
@@ -333,6 +358,7 @@ pub(crate) fn evaluate_offer(
     Ok(EconomicsEvaluation {
         provider: offer.provider.clone(),
         offer_id: offer.offer_id.clone(),
+        capacity_scope: state.capacity_scope.clone(),
         execution_model: offer.execution_model.clone(),
         offer_shape: shape,
         cache_state: state.cache_state.clone(),
@@ -400,14 +426,22 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
         report.predicted_warm_duration_ms as f64 / 1000.0
     ));
 
-    output.push_str("| Provider | Offer | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
-    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
+    output.push_str(
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n",
+    );
 
     for evaluation in &report.evaluations {
+        let scope = evaluation
+            .capacity_scope
+            .as_ref()
+            .map(|scope| format!("{}:{}", scope.kind, scope.key))
+            .unwrap_or_else(|| "-".into());
         output.push_str(&format!(
-            "| {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {}/{} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | {} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            scope,
             evaluation.cache_state,
             evaluation.queue_depth,
             evaluation.running_jobs,
@@ -448,6 +482,7 @@ mod tests {
         CapacityState {
             provider: "test".into(),
             offer_id: "test".into(),
+            capacity_scope: None,
             queue_depth,
             running_jobs,
             parallel_slots,
@@ -471,6 +506,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: None,

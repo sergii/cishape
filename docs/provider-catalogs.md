@@ -28,6 +28,7 @@ Every offer records:
 - provider offer ID
 - optional CI runner label
 - optional repository visibility context when the same runner label maps to different capacity/commercial semantics
+- optional required capacity-scope kind when queue/concurrency evidence must cover a specific domain
 - CPU and memory when verified
 - OS and architecture
 - execution model
@@ -149,6 +150,19 @@ The 2026-09-29 snapshot contains:
 - Hetzner CX33 as a fixed self-hosted VM example
 
 The source URLs are stored alongside each catalog record so a future refresh can be reviewed as data provenance.
+
+## Capacity-scope requirements
+
+Offer identity may also constrain the scope of runtime concurrency evidence.
+
+The checked-in GitHub standard `ubuntu-latest` public/private offers require `provider_account` scope. This is separate from repository visibility:
+
+```text
+repository_visibility -> which machine/commercial contract applies
+capacity_scope        -> which population queue/concurrency evidence covers
+```
+
+Both checks must pass before economics evaluates the offer.
 
 ## Boundary
 

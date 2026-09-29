@@ -159,7 +159,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1, CAPACITY2, CAPACITY3, CAPACITY4, CAPACITY5, CAPACITY6, CAPACITY7, and CAPACITY8 implemented.
+Status: CAPACITY1 through CAPACITY9 implemented.
 
 CAPACITY1:
 
@@ -246,7 +246,18 @@ CAPACITY8:
 - append economics advisory to the GitHub job summary
 - preserve read-only permissions and no routing side effects
 
-Next: add provider-specific capacity/catalog discovery where APIs expose reliable facts, then validate economics advisory against real account capacity evidence.
+CAPACITY9:
+
+- add provider-neutral `repository` and `provider_account` concurrency scope kinds
+- carry scope kind + concrete key on each CapacityState
+- let provider offers require a capacity-scope kind without breaking generic snapshots
+- mark the current GitHub scanner as repository-scoped
+- require provider-account scope for standard GitHub-hosted runner offers
+- skip missing/mismatched scope before queue or workflow scheduling math
+- preserve scope evidence in single-job, batch, and workflow reports
+- keep account-wide inference out of the repository-only adapter
+
+Next: add an account/org-wide capacity observer where the provider API exposes reliable scope-complete facts, then run the first real account-capacity dogfood proof.
 
 ## VS9 - Cloud ingest
 

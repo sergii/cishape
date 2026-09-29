@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::RepositoryVisibility;
 use crate::economics::{CacheState, CapacitySnapshot, CapacityState};
 use anyhow::{Context, Result};
@@ -195,6 +196,7 @@ impl GitHubCapacityClient {
             .map(|(pool, (queue_depth, running_jobs))| CapacityState {
                 provider: pool.provider.clone(),
                 offer_id: pool.offer_id.clone(),
+                capacity_scope: Some(CapacityScope::repository(repository)),
                 queue_depth,
                 running_jobs,
                 parallel_slots: pool.parallel_slots,
@@ -426,6 +428,7 @@ fn observed_at_now() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capacity_scope::CapacityScopeKind;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
@@ -541,6 +544,13 @@ mod tests {
         assert_eq!(state.parallel_slots, 4);
         assert_eq!(state.slot_turnover_ms, 12_000);
         assert_eq!(
+            state.capacity_scope,
+            Some(CapacityScope {
+                kind: CapacityScopeKind::Repository,
+                key: "owner/repo".into(),
+            })
+        );
+        assert_eq!(
             snapshot.repository_visibility,
             Some(RepositoryVisibility::Private)
         );
@@ -615,6 +625,17 @@ mod tests {
 
         assert_eq!((github.queue_depth, github.running_jobs), (1, 1));
         assert_eq!((depot.queue_depth, depot.running_jobs), (1, 1));
+        assert_eq!(
+            github.capacity_scope.as_ref().map(|scope| &scope.kind),
+            Some(&CapacityScopeKind::Repository)
+        );
+        assert_eq!(
+            depot
+                .capacity_scope
+                .as_ref()
+                .map(|scope| scope.key.as_str()),
+            Some("owner/repo")
+        );
 
         let requests = captured
             .recv_timeout(Duration::from_secs(2))
