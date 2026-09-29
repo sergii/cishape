@@ -31,6 +31,10 @@ use cishape::optimize::{
 };
 use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_markdown};
 use cishape::policy::OptimizationPolicy;
+use cishape::reservation::{
+    ReservationLedger, ReservationPolicy, ReservationRequest, expire_due as expire_reservations,
+    release as release_reservation, reserve as reserve_worker,
+};
 use cishape::store::Store;
 use cishape::synthetic;
 use cishape::worker_state::WorkerStateSnapshot;
@@ -427,6 +431,49 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Produce a CAS reservation transition from admission-approved worker state.
+    ReservationReserve {
+        #[arg(long)]
+        admission: PathBuf,
+        #[arg(long)]
+        workers: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long, default_value = "policies/reservation-default-v1.json")]
+        policy: PathBuf,
+        #[arg(long)]
+        ledger: Option<PathBuf>,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Produce a deterministic release transition for an active lease.
+    ReservationRelease {
+        #[arg(long)]
+        workers: PathBuf,
+        #[arg(long)]
+        ledger: PathBuf,
+        #[arg(long)]
+        lease_id: String,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Expire all due leases for one worker in a deterministic transition.
+    ReservationExpire {
+        #[arg(long)]
+        workers: PathBuf,
+        #[arg(long)]
+        ledger: PathBuf,
+        #[arg(long)]
+        worker_id: String,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -700,6 +747,49 @@ fn main() -> Result<()> {
             policy,
             output,
         } => admission_command(&plan, &binding, &workers, &policy, output.as_deref()),
+        Command::ReservationReserve {
+            admission,
+            workers,
+            request,
+            policy,
+            ledger,
+            now_unix_ms,
+            output,
+        } => reservation_reserve_command(
+            &admission,
+            &workers,
+            &request,
+            &policy,
+            ledger.as_deref(),
+            now_unix_ms,
+            output.as_deref(),
+        ),
+        Command::ReservationRelease {
+            workers,
+            ledger,
+            lease_id,
+            now_unix_ms,
+            output,
+        } => reservation_release_command(
+            &workers,
+            &ledger,
+            &lease_id,
+            now_unix_ms,
+            output.as_deref(),
+        ),
+        Command::ReservationExpire {
+            workers,
+            ledger,
+            worker_id,
+            now_unix_ms,
+            output,
+        } => reservation_expire_command(
+            &workers,
+            &ledger,
+            &worker_id,
+            now_unix_ms,
+            output.as_deref(),
+        ),
         Command::Explain {
             db,
             repository,
@@ -1428,6 +1518,92 @@ fn admission_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote admission report to {}", path.display());
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn reservation_reserve_command(
+    admission_path: &Path,
+    workers_path: &Path,
+    request_path: &Path,
+    policy_path: &Path,
+    ledger_path: Option<&Path>,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    let admission = cishape::admission::AdmissionReport::load(admission_path)?;
+    let workers = WorkerStateSnapshot::load(workers_path)?;
+    let request = ReservationRequest::load(request_path)?;
+    let policy = ReservationPolicy::load(policy_path)?;
+    let ledger = match ledger_path {
+        Some(path) => ReservationLedger::load(path)?,
+        None => ReservationLedger::empty(),
+    };
+    let worker = workers
+        .workers
+        .iter()
+        .find(|worker| worker.worker_id == request.worker_id)
+        .with_context(|| format!("worker {} not found in snapshot", request.worker_id))?;
+    let transition = reserve_worker(worker, &admission, &ledger, &request, &policy, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
+}
+
+fn reservation_release_command(
+    workers_path: &Path,
+    ledger_path: &Path,
+    lease_id: &str,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    let workers = WorkerStateSnapshot::load(workers_path)?;
+    let ledger = ReservationLedger::load(ledger_path)?;
+    let lease = ledger
+        .leases
+        .iter()
+        .find(|lease| lease.lease_id == lease_id)
+        .with_context(|| format!("lease {lease_id} not found"))?;
+    let worker = workers
+        .workers
+        .iter()
+        .find(|worker| worker.worker_id == lease.worker_id)
+        .with_context(|| format!("worker {} not found in snapshot", lease.worker_id))?;
+    let transition = release_reservation(worker, &ledger, lease_id, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
+}
+
+fn reservation_expire_command(
+    workers_path: &Path,
+    ledger_path: &Path,
+    worker_id: &str,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    let workers = WorkerStateSnapshot::load(workers_path)?;
+    let ledger = ReservationLedger::load(ledger_path)?;
+    let worker = workers
+        .workers
+        .iter()
+        .find(|worker| worker.worker_id == worker_id)
+        .with_context(|| format!("worker {worker_id} not found in snapshot"))?;
+    let transition = expire_reservations(worker, &ledger, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
+}
+
+fn write_reservation_transition(
+    transition: &cishape::reservation::ReservationTransition,
+    output: Option<&Path>,
+) -> Result<()> {
+    let payload =
+        serde_json::to_string_pretty(transition).context("serialize ReservationTransition")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote reservation transition to {}", path.display());
     } else {
         println!("{payload}");
     }
