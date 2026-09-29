@@ -277,13 +277,13 @@ fn fit_target(plan: &ExecutionPlan, target: &ExecutorTarget) -> ExecutorFit {
     }
 
     if let Some(placement) = &plan.placement {
-        if let Some(architecture) = &placement.architecture {
-            if !target.architectures.contains(architecture) {
-                exclusions.push(BindingExclusion {
-                    code: ExclusionCode::UnsupportedArchitecture,
-                    detail: format!("executor does not support architecture {architecture}"),
-                });
-            }
+        if let Some(architecture) = &placement.architecture
+            && !target.architectures.contains(architecture)
+        {
+            exclusions.push(BindingExclusion {
+                code: ExclusionCode::UnsupportedArchitecture,
+                detail: format!("executor does not support architecture {architecture}"),
+            });
         }
 
         for capability in &placement.required_capabilities {
