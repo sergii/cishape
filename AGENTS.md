@@ -68,6 +68,10 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - Reservation request IDs are idempotency keys. Exact replay must not double-reserve; conflicting reuse must fail closed.
 - The reservation state machine is not a distributed transaction by itself. A production adapter must atomically compare revision, mutate reserved capacity/count, advance revision, and insert the lease.
 - Lease release/expiry returns only reserved resources and must leave terminal lease evidence instead of deleting idempotency history.
+- Keep analytical history storage separate from authoritative reservation/control-plane state. Do not reuse CI history tables as scheduler state.
+- The first DuckDB ReservationStore is single-authority/single-writer-process only. Do not present a shared DuckDB file as a horizontally scaled control-plane database.
+- ReservationStore reads must validate canonical domain JSON against indexed CAS/identity fields and fail closed on disagreement.
+- Initial worker seeding is idempotent only for identical state. It must never overwrite a worker whose authoritative reservation state has changed.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence

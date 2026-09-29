@@ -306,11 +306,19 @@ RESERVATION1 does not provide:
 - VM/container creation;
 - GitHub runner registration.
 
+## Persistence boundary
+
+RESERVATIONSTORE1 now implements the first authoritative transactional adapter for one writer process.
+
+See `docs/reservation-store.md`.
+
+The domain state machine remains storage-agnostic. The DuckDB adapter atomically persists worker CAS state and lease/idempotency history for the first single-process executor proof.
+
+Horizontal or multi-instance control-plane deployment still requires a store implementation whose concurrency model supports independent writers, such as a future Postgres adapter.
+
 ## Next boundary
 
-Before concurrent real execution, add an authoritative reservation store adapter that implements the CAS mutation atomically.
-
-After that, the executor lifecycle can safely add:
+The executor lifecycle can now add:
 
 ```text
 RESERVED
@@ -320,4 +328,4 @@ RESERVED
   -> FINISHED
 ```
 
-The first microVM proof can then bind the reserved plan to Boxd or native Firecracker without relying on advisory state alone.
+The first microVM proof can bind an active authoritative lease to Boxd or native Firecracker without relying on advisory state alone.

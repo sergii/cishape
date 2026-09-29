@@ -584,6 +584,37 @@ RESERVATION1:
 
 Next: RESERVATIONSTORE1 - implement one authoritative atomic storage adapter for compare+reserve+lease insert before connecting a real microVM executor.
 
+## VS10.10 - Authoritative reservation store
+
+Status: RESERVATIONSTORE1 implemented.
+
+Goal:
+
+```text
+RESERVATION1 domain transition
+  + authoritative WorkerState
+  + lease/idempotency history
+  -> one transactional commit
+```
+
+RESERVATIONSTORE1:
+
+- introduce a ReservationStore boundary independent of the domain state machine
+- keep mutable reservation/control-plane state in a separate database from CI profiling history
+- implement the first adapter with the already-pinned DuckDB dependency
+- explicitly scope DuckDB to one authoritative writer process
+- persist canonical WorkerState and ReservationLease JSON plus indexed CAS/identity fields
+- validate indexed fields against domain JSON on every read
+- seed workers idempotently only when authoritative state is identical
+- atomically CAS worker revision + persist reserved accounting + insert lease
+- atomically persist release and due-expiry transitions
+- preserve request/lease uniqueness for idempotency
+- fail closed on stale revision and state/index disagreement
+- provide CLI proof commands against `.cishape/reservations.duckdb`
+- avoid claiming multi-process/horizontal DuckDB write safety
+
+Next: EXECUTOR1 - define the reserved-to-starting/running execution ownership transition and connect one real microVM backend in a single control-plane process. Add a Postgres ReservationStore before multi-instance control-plane deployment.
+
 ## VS11 - Controlled routing
 
 Only after advisory recommendations, execution plans, capability binding, and live capacity evidence prove reliable, allow opt-in automation through existing CI control planes.
