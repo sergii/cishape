@@ -32,8 +32,8 @@ use cishape::outcome::{evaluate as evaluate_outcome, to_markdown as outcome_to_m
 use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
-use cishape::workflow::{WorkflowDemand, evaluate as evaluate_workflow_economics};
 use cishape::worker_state::WorkerStateSnapshot;
+use cishape::workflow::{WorkflowDemand, evaluate as evaluate_workflow_economics};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
 
