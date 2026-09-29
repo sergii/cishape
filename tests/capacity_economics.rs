@@ -96,6 +96,25 @@ fn account_scoped_offer_rejects_repository_scoped_concurrency_evidence() {
             && item.reason.contains("requires provider_account capacity scope")
             && item.reason.contains("repository")
     }));
+
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.capacity_scope = None;
+
+    let unknown = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("unknown-scope economics");
+    assert!(unknown.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-private-x64"
+            && item.reason.contains("snapshot state scope is unknown")
+    }));
 }
 
 #[test]
