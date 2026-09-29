@@ -124,6 +124,14 @@ CATALOG2:
 - require explicit visibility for `catalog-fit` to include context-specific offers
 - encode the current public standard Ubuntu shape and zero runner-usage price without changing private-runner economics
 
+CATALOG3:
+
+- carry optional repository visibility in CapacitySnapshot without breaking generic snapshots
+- observe public/private visibility from GitHub repository metadata
+- require contextual offers to match the live snapshot context
+- fail closed when contextual visibility is missing or mismatched
+- preserve repository context in single-job, batch, workflow, and economics-advisory evidence
+
 Next: refresh adapters/API-backed catalogs where providers expose reliable machine/price data.
 
 ## VS7 - Policy and outcomes
