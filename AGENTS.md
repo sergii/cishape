@@ -28,6 +28,7 @@ CIShape is not a CI control plane and must not become one by accident.
 - Provider-specific integrations adapt to the core model. The core model must not depend on GitHub, Buildkite, Depot, Namespace, Blacksmith, or another provider.
 - Provider prices and machine offers are dated observations with provenance, not eternal constants.
 - A provider runner label is not sufficient offer identity. If the same label has different capacity or commercial semantics by repository/account context, model distinct offer IDs and require the relevant context explicitly.
+- Context-specific offers must be checked against explicit runtime context evidence. If required repository/account context is missing or mismatched, skip the offer rather than inferring context from its label or ID.
 - Never fabricate missing provider capacity, billing increments, or prices. Incomplete offers may remain visible but must not become selectable candidates.
 - Do not compare fixed self-hosted server pricing to ephemeral per-job runner pricing without an explicit utilization/capacity model.
 - Runtime queue/capacity snapshots are time-scoped observations and must remain separate from static provider catalog facts.
