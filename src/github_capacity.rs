@@ -216,11 +216,7 @@ impl GitHubCapacityClient {
         Ok(snapshot)
     }
 
-    fn repository_visibility(
-        &self,
-        token: &str,
-        repository: &str,
-    ) -> Result<RepositoryVisibility> {
+    fn repository_visibility(&self, token: &str, repository: &str) -> Result<RepositoryVisibility> {
         let url = format!("{}/repos/{repository}", self.api_base);
         let metadata: RepositoryMetadata = self.get_json(token, &url)?;
         Ok(if metadata.is_private {
