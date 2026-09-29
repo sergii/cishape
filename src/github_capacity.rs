@@ -182,6 +182,7 @@ impl GitHubCapacityClient {
         anyhow::ensure!(!token.trim().is_empty(), "GitHub token is empty");
         anyhow::ensure!(!self.api_base.is_empty(), "GitHub API base is empty");
 
+        let observed_at = observed_at_now()?;
         let user = self.authenticated_user(token)?;
         let (target_owner, _) = config
             .repository
@@ -262,7 +263,7 @@ impl GitHubCapacityClient {
         };
         let snapshot = CapacitySnapshot {
             schema_version: 1,
-            observed_at: observed_at_now()?,
+            observed_at,
             source: format!(
                 "github-actions-account-rest-v{GITHUB_API_VERSION}:{scope_key}"
             ),
@@ -803,6 +804,112 @@ mod tests {
             .recv_timeout(Duration::from_secs(2))
             .expect("captures");
         assert_eq!(requests.len(), 5);
+    }
+
+    #[test]
+    fn account_scan_aggregates_all_owned_repositories() {
+        let responses = vec![
+            r#"{"login":"owner","public_repos":1,"owned_private_repos":1}"#,
+            r#"[{"full_name":"owner/repo","owner":{"login":"owner"},"private":true},{"full_name":"owner/public","owner":{"login":"owner"},"private":false}]"#,
+            r#"{"total_count":1,"workflow_runs":[{"id":10}]}"#,
+            r#"{"total_count":0,"workflow_runs":[]}"#,
+            r#"{"total_count":1,"jobs":[{"status":"queued","labels":["ubuntu-latest"]}]}"#,
+            r#"{"total_count":0,"workflow_runs":[]}"#,
+            r#"{"total_count":1,"workflow_runs":[{"id":20}]}"#,
+            r#"{"total_count":1,"jobs":[{"status":"in_progress","labels":["ubuntu-latest"]}]}"#,
+        ];
+        let (api_base, captured) = spawn_server(responses);
+        let client = GitHubCapacityClient::new(api_base);
+
+        let snapshot = client
+            .collect_account("secret-token", &config())
+            .expect("account snapshot");
+        let state = snapshot.states.first().expect("capacity state");
+
+        assert_eq!(state.queue_depth, 1);
+        assert_eq!(state.running_jobs, 1);
+        assert_eq!(
+            state.capacity_scope,
+            Some(CapacityScope {
+                kind: CapacityScopeKind::ProviderAccount,
+                key: "github:user:owner".into(),
+            })
+        );
+        assert_eq!(
+            snapshot.repository_visibility,
+            Some(RepositoryVisibility::Private)
+        );
+        assert!(snapshot.source.contains("github:user:owner"));
+
+        let requests = captured
+            .recv_timeout(Duration::from_secs(2))
+            .expect("captures");
+        assert_eq!(requests.len(), 8);
+        assert!(requests[0].contains("GET /user "));
+        assert!(requests[1].contains(
+            "GET /user/repos?affiliation=owner&visibility=all&per_page=100&page=1 "
+        ));
+        assert!(requests.iter().any(|request| {
+            request.contains("GET /repos/owner/repo/actions/runs?status=queued")
+        }));
+        assert!(requests.iter().any(|request| {
+            request.contains("GET /repos/owner/public/actions/runs?status=in_progress")
+        }));
+    }
+
+    #[test]
+    fn account_scan_requires_private_inventory_visibility() {
+        let responses = vec![r#"{"login":"owner","public_repos":1}"#];
+        let (api_base, _) = spawn_server(responses);
+        let client = GitHubCapacityClient::new(api_base);
+
+        let error = client
+            .collect_account("secret-token", &config())
+            .expect_err("missing private inventory must fail");
+
+        assert!(error.to_string().contains("owned_private_repos"));
+    }
+
+    #[test]
+    fn account_scan_rejects_authenticated_owner_mismatch() {
+        let responses = vec![r#"{"login":"different","public_repos":1,"owned_private_repos":0}"#];
+        let (api_base, _) = spawn_server(responses);
+        let client = GitHubCapacityClient::new(api_base);
+
+        let error = client
+            .collect_account("secret-token", &config())
+            .expect_err("owner mismatch must fail");
+
+        assert!(error.to_string().contains("does not match authenticated GitHub user"));
+    }
+
+    #[test]
+    fn account_scan_fails_when_owned_repository_inventory_is_incomplete() {
+        let responses = vec![
+            r#"{"login":"owner","public_repos":2,"owned_private_repos":1}"#,
+            r#"[{"full_name":"owner/repo","owner":{"login":"owner"},"private":true},{"full_name":"owner/public","owner":{"login":"owner"},"private":false}]"#,
+        ];
+        let (api_base, _) = spawn_server(responses);
+        let client = GitHubCapacityClient::new(api_base);
+
+        let error = client
+            .collect_account("secret-token", &config())
+            .expect_err("partial inventory must fail");
+
+        assert!(error.to_string().contains("inventory is incomplete"));
+    }
+
+    #[test]
+    fn account_scan_rejects_external_runner_provider_identity() {
+        let mut input = config();
+        input.provider = "depot".into();
+        let client = GitHubCapacityClient::default();
+
+        let error = client
+            .collect_account("secret-token", &input)
+            .expect_err("external provider account scope must fail");
+
+        assert!(error.to_string().contains("only provider github-actions"));
     }
 
     #[test]
