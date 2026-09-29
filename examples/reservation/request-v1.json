@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "request_id": "req-example-001",
+  "worker_id": "worker-a",
+  "expected_worker_state_revision": 7,
+  "lease_ttl_ms": 60000
+}

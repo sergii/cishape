@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "policy_id": "reservation-default-v1",
+  "min_lease_ttl_ms": 1000,
+  "max_lease_ttl_ms": 900000
+}

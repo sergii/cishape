@@ -55,8 +55,9 @@ Carries concrete host runtime evidence:
 - lifecycle;
 - physical capacity;
 - configured allocation limit;
-- current allocated capacity;
-- running/max allocation counts;
+- current running and reserved capacity;
+- running/reserved/max allocation counts;
+- monotonic worker state revision;
 - optional pressure evidence.
 
 ### AdmissionPolicy
@@ -122,7 +123,7 @@ For each worker ADMISSION1 checks:
 ```text
 executor is statically compatible
 lifecycle == ready
-running_allocations < max_allocations
+running_allocations + reserved_allocations < max_allocations
 policy-eligible CPU >= target CPU
 policy-eligible RAM >= target RAM
 post-admission reserve remains intact
@@ -194,11 +195,14 @@ Representative shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "algorithm": "worker-admission-v1",
   "policy_id": "admission-default-v1",
   "job": "test",
   "repository": "acme/api",
+  "plan": {
+    "...": "exact ExecutionPlan evidence embedded here"
+  },
   "outcome": "admit",
   "admissible_worker_ids": ["worker-a"],
   "workers": []
@@ -206,6 +210,8 @@ Representative shape:
 ```
 
 There is intentionally no `selected_worker_id`.
+
+AdmissionReport schema v2 embeds the exact ExecutionPlan and records the `state_revision` for every evaluated worker. A reservation request must match that revision, so an admission artifact becomes stale as soon as any admission-relevant worker state changes.
 
 ## Oversubscription example
 
@@ -254,7 +260,7 @@ ADMISSION1 does not:
 
 ## Next boundary
 
-The next control-plane contract should be reservation/lease semantics:
+RESERVATION1 implements the next domain contract for reservation/lease semantics:
 
 ```text
 AdmissionReport
@@ -265,4 +271,4 @@ AdmissionReport
 atomic Reservation / Lease
 ```
 
-Only after that boundary exists is it safe to connect admission to a real Boxd or Firecracker executor.
+See `docs/reservation.md`. The state-machine contract now exists, but a production storage adapter must still commit the compare-and-swap worker mutation and lease insert atomically before concurrent real execution is safe.

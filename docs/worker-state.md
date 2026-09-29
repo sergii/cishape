@@ -42,7 +42,7 @@ Several workers may share the same `executor_id`.
 
 ## Capacity model
 
-Each worker records three capacity shapes.
+WorkerState schema v2 records four capacity shapes plus a monotonic scheduling revision.
 
 ### physical_capacity
 
@@ -71,13 +71,24 @@ WORKERSTATE1 never invents an oversubscription ratio.
 
 The capacity already assigned to running allocations.
 
-The snapshot fails closed if allocated capacity exceeds the explicit allocation limit.
+### reserved_capacity
+
+The capacity leased by RESERVATION1 but not yet converted into running execution.
+
+The snapshot fails closed if running plus reserved capacity exceeds the explicit allocation limit.
 
 Available allocation capacity is derived deterministically:
 
 ```text
-available = allocation_limit - allocated_capacity
+committed = allocated_capacity + reserved_capacity
+available = allocation_limit - committed
 ```
+
+### state_revision
+
+Every worker has a positive monotonic `state_revision`.
+
+Any admission-relevant change must advance it. This includes lifecycle, capacity, running allocation, reservation, and pressure evidence changes. Admission records the revision it evaluated so a later reservation can reject stale evidence.
 
 ## Allocation count
 
@@ -87,10 +98,15 @@ A worker also carries:
 
 ```text
 running_allocations
+reserved_allocations
 max_allocations
 ```
 
-This provides a separate hard ceiling for process/container/microVM count.
+The hard ceiling applies to committed count:
+
+```text
+running_allocations + reserved_allocations <= max_allocations
+```
 
 A worker may have free CPU and memory and still reject new work later because its allocation-count ceiling has been reached.
 
@@ -139,6 +155,7 @@ The command emits a deterministic report containing both raw capacity evidence a
 {
   "worker_id": "worker-a",
   "executor_id": "firecracker-like-microvm-x86_64",
+  "state_revision": 7,
   "lifecycle": "ready",
   "physical_capacity": {
     "cpu_millis": 32000,
@@ -152,11 +169,21 @@ The command emits a deterministic report containing both raw capacity evidence a
     "cpu_millis": 20000,
     "memory_bytes": 42949672960
   },
+  "reserved_capacity": {
+    "cpu_millis": 0,
+    "memory_bytes": 0
+  },
+  "committed_capacity": {
+    "cpu_millis": 20000,
+    "memory_bytes": 42949672960
+  },
   "available_capacity": {
     "cpu_millis": 28000,
     "memory_bytes": 85899345920
   },
   "running_allocations": 6,
+  "reserved_allocations": 0,
+  "committed_allocations": 6,
   "max_allocations": 16,
   "accepting_new_work": true
 }
@@ -168,7 +195,7 @@ WORKERSTATE1 uses only structural runtime facts:
 
 ```text
 lifecycle == ready
-AND running_allocations < max_allocations
+AND running_allocations + reserved_allocations < max_allocations
 AND available CPU > 0
 AND available memory > 0
 ```
@@ -184,8 +211,8 @@ That plan-specific decision belongs to ADMISSION1.
 WORKERSTATE1 does not:
 
 - select a worker;
-- reserve capacity;
-- mutate allocated counters;
+- create reservations itself;
+- mutate authoritative state from the inspection CLI;
 - compare job demand with a worker;
 - prioritize queues;
 - provision a microVM;
@@ -220,4 +247,4 @@ That layer can answer, without side effects:
 - why a worker is excluded;
 - whether the result is ADMIT, DEFER, or no eligible worker.
 
-Reservation and scheduling still come later.
+ADMISSION1 is implemented. RESERVATION1 adds the CAS lease transition that consumes this revisioned worker evidence; see `docs/reservation.md`.

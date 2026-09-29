@@ -142,6 +142,31 @@ Admission checks concrete runtime eligibility without choosing or mutating a wor
 
 See `docs/admission.md`.
 
+
+### Reservation and leases
+
+RESERVATION1 introduces the first state-changing execution-plane contract.
+
+WorkerState v2 separates running allocation from reserved-but-not-started allocation and carries a monotonic `state_revision`. AdmissionReport v2 records the revision it evaluated.
+
+A reservation request chooses one admission-approved worker and supplies an idempotency key, expected worker revision, and bounded lease TTL. CPU/RAM come only from the exact admitted ExecutionPlan.
+
+The domain transition is compare-and-swap:
+
+```text
+expected revision N
+  + admitted plan
+  -> reserve resources
+  -> revision N+1
+  -> active lease
+```
+
+A second independent request from revision N becomes stale. Exact request replay is idempotent. Release/expiry returns reserved capacity and advances revision while retaining terminal lease evidence.
+
+The Rust state machine and CLI are deterministic proofs, not a distributed storage implementation. A production adapter must commit the compare, worker mutation, revision advance, and lease insert atomically.
+
+See `docs/reservation.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.

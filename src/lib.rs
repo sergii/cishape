@@ -17,6 +17,7 @@ pub mod observe;
 pub mod optimize;
 pub mod outcome;
 pub mod policy;
+pub mod reservation;
 pub mod store;
 pub mod synthetic;
 pub mod worker_state;
