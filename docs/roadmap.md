@@ -551,6 +551,39 @@ ADMISSION1:
 
 Next: RESERVATION1 - define an atomic lease/reservation contract so two schedulers cannot consume the same snapshot capacity before any real executor is connected.
 
+## VS10.9 - Reservation and lease state machine
+
+Status: RESERVATION1 implemented.
+
+Goal:
+
+```text
+AdmissionReport
+  + current WorkerState
+  + ReservationRequest
+  + ReservationLedger
+  + ReservationPolicy
+  -> CAS ReservationTransition
+```
+
+RESERVATION1:
+
+- upgrade WorkerState to schema v2 with state_revision, reserved capacity, and reserved allocation count
+- subtract both running and reserved resources from available allocation capacity
+- upgrade AdmissionReport to schema v2 with exact ExecutionPlan and per-worker revision evidence
+- derive reservation CPU/RAM only from the admitted ExecutionPlan
+- use request_id as deterministic idempotency/lease identity
+- bound lease TTL with versioned policy
+- return stale_worker_state when current revision no longer matches admission
+- make exact retries idempotent and conflicting request-ID reuse fail closed
+- support release and expiry transitions that return reserved resources
+- retain released/expired leases as terminal evidence
+- advance worker revision on every successful reservation/release/expiry mutation
+- prove through tests that two independent requests from one revision cannot both reserve
+- keep the CLI as an offline transition proof, not a claim of distributed storage atomicity
+
+Next: RESERVATIONSTORE1 - implement one authoritative atomic storage adapter for compare+reserve+lease insert before connecting a real microVM executor.
+
 ## VS11 - Controlled routing
 
 Only after advisory recommendations, execution plans, capability binding, and live capacity evidence prove reliable, allow opt-in automation through existing CI control planes.
