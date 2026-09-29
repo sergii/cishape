@@ -1,4 +1,4 @@
-use crate::capacity_scope::{CapacityScope, CapacityScopeKind};
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::RepositoryVisibility;
 use crate::economics::{CacheState, CapacitySnapshot, CapacityState};
 use anyhow::{Context, Result};
@@ -428,6 +428,7 @@ fn observed_at_now() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capacity_scope::CapacityScopeKind;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
@@ -629,8 +630,8 @@ mod tests {
             Some(&CapacityScopeKind::Repository)
         );
         assert_eq!(
-            depot.capacity_scope.as_ref().map(|scope| &scope.key),
-            Some(&"owner/repo".to_string())
+            depot.capacity_scope.as_ref().map(|scope| scope.key.as_str()),
+            Some("owner/repo")
         );
 
         let requests = captured
