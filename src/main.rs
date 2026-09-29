@@ -858,23 +858,13 @@ fn main() -> Result<()> {
             lease_id,
             now_unix_ms,
             output,
-        } => reservation_store_release_command(
-            &db,
-            &lease_id,
-            now_unix_ms,
-            output.as_deref(),
-        ),
+        } => reservation_store_release_command(&db, &lease_id, now_unix_ms, output.as_deref()),
         Command::ReservationStoreExpire {
             db,
             worker_id,
             now_unix_ms,
             output,
-        } => reservation_store_expire_command(
-            &db,
-            &worker_id,
-            now_unix_ms,
-            output.as_deref(),
-        ),
+        } => reservation_store_expire_command(&db, &worker_id, now_unix_ms, output.as_deref()),
         Command::Explain {
             db,
             repository,
