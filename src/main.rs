@@ -35,6 +35,7 @@ use cishape::reservation::{
     ReservationLedger, ReservationPolicy, ReservationRequest, expire_due as expire_reservations,
     release as release_reservation, reserve as reserve_worker,
 };
+use cishape::reservation_store::{DuckDbReservationStore, ReservationStore};
 use cishape::store::Store;
 use cishape::synthetic;
 use cishape::worker_state::WorkerStateSnapshot;
@@ -474,6 +475,50 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Seed an authoritative single-writer reservation store from worker evidence.
+    ReservationStoreSeed {
+        #[arg(long, default_value = ".cishape/reservations.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        workers: PathBuf,
+    },
+    /// Atomically reserve an admission-approved worker in the authoritative store.
+    ReservationStoreReserve {
+        #[arg(long, default_value = ".cishape/reservations.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        admission: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long, default_value = "policies/reservation-default-v1.json")]
+        policy: PathBuf,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Atomically release an active reservation lease in the authoritative store.
+    ReservationStoreRelease {
+        #[arg(long, default_value = ".cishape/reservations.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        lease_id: String,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Atomically expire due leases for one worker in the authoritative store.
+    ReservationStoreExpire {
+        #[arg(long, default_value = ".cishape/reservations.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        worker_id: String,
+        #[arg(long)]
+        now_unix_ms: u64,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -786,6 +831,46 @@ fn main() -> Result<()> {
         } => reservation_expire_command(
             &workers,
             &ledger,
+            &worker_id,
+            now_unix_ms,
+            output.as_deref(),
+        ),
+        Command::ReservationStoreSeed { db, workers } => {
+            reservation_store_seed_command(&db, &workers)
+        }
+        Command::ReservationStoreReserve {
+            db,
+            admission,
+            request,
+            policy,
+            now_unix_ms,
+            output,
+        } => reservation_store_reserve_command(
+            &db,
+            &admission,
+            &request,
+            &policy,
+            now_unix_ms,
+            output.as_deref(),
+        ),
+        Command::ReservationStoreRelease {
+            db,
+            lease_id,
+            now_unix_ms,
+            output,
+        } => reservation_store_release_command(
+            &db,
+            &lease_id,
+            now_unix_ms,
+            output.as_deref(),
+        ),
+        Command::ReservationStoreExpire {
+            db,
+            worker_id,
+            now_unix_ms,
+            output,
+        } => reservation_store_expire_command(
+            &db,
             &worker_id,
             now_unix_ms,
             output.as_deref(),
@@ -1609,6 +1694,60 @@ fn write_reservation_transition(
     }
 
     Ok(())
+}
+
+fn reservation_store_seed_command(db: &Path, workers_path: &Path) -> Result<()> {
+    ensure_parent(db)?;
+    let workers = WorkerStateSnapshot::load(workers_path)?;
+    let mut store = DuckDbReservationStore::open(db)?;
+    let inserted = store.seed_workers(&workers)?;
+    println!(
+        "reservation store {}: seeded {} new worker(s)",
+        db.display(),
+        inserted
+    );
+    Ok(())
+}
+
+fn reservation_store_reserve_command(
+    db: &Path,
+    admission_path: &Path,
+    request_path: &Path,
+    policy_path: &Path,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    ensure_parent(db)?;
+    let admission = cishape::admission::AdmissionReport::load(admission_path)?;
+    let request = ReservationRequest::load(request_path)?;
+    let policy = ReservationPolicy::load(policy_path)?;
+    let mut store = DuckDbReservationStore::open(db)?;
+    let transition = store.reserve(&admission, &request, &policy, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
+}
+
+fn reservation_store_release_command(
+    db: &Path,
+    lease_id: &str,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    ensure_parent(db)?;
+    let mut store = DuckDbReservationStore::open(db)?;
+    let transition = store.release(lease_id, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
+}
+
+fn reservation_store_expire_command(
+    db: &Path,
+    worker_id: &str,
+    now_unix_ms: u64,
+    output: Option<&Path>,
+) -> Result<()> {
+    ensure_parent(db)?;
+    let mut store = DuckDbReservationStore::open(db)?;
+    let transition = store.expire_due(worker_id, now_unix_ms)?;
+    write_reservation_transition(&transition, output)
 }
 
 fn decide_command(
