@@ -153,9 +153,26 @@ A transport error or non-success HTTP status produces no DecisionRecord. A synta
 JEV2 remains shadow-only and has no CI execution side effects.
 
 
-## Deferred Jev live proof
+## Live Jev proof
 
-The live Jev proof is implemented but intentionally optional. CIShape development does not wait for a Jev credential.
+LIVE1 is complete.
+
+The manual GitHub Actions proof successfully consumed real rolling CIShape history and performed a live Jev System One call in shadow mode.
+
+Observed proof:
+
+- repository: `sergii/cishape`
+- workload: `test`
+- evidence runs: 24
+- deterministic baseline: `cpu8-mem16`
+- feasible candidates: 2
+- Jev selected: `cpu8-mem16`
+- confidence: 0.88
+- resolved engine: `jev-1.13.0`
+- agreement with deterministic baseline: true
+- workflow run: Jev Shadow Proof #1
+
+This proves the credentialed transport, bounded request, response validation, evidence persistence, and comparison path. It does not prove that Jev should control runner routing, and no routing side effect occurred.
 
 ## Credentialed GitHub proof
 
