@@ -12,7 +12,11 @@
       "slot_turnover_ms": 12000,
       "cache_state": "cold",
       "cache_penalty_ms": 4000,
-      "utilization": null
+      "utilization": null,
+      "scope": {
+        "kind": "provider_account",
+        "key": "synthetic-github-account"
+      }
     },
     {
       "provider": "depot",
