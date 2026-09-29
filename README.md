@@ -14,6 +14,12 @@ CPU8-MEM16  = 8 vCPU / 16 GiB RAM
 
 CPU and memory remain separate dimensions. External machine-readable IDs use lowercase hyphenated forms such as `cpu8-mem16`; human-facing output uses `CPU8-MEM16`.
 
+## License
+
+CIShape is licensed under the **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`). See [LICENSE](LICENSE).
+
+If you modify CIShape and make that modified version available for users to interact with over a network, AGPL section 13 requires offering those users the Corresponding Source of that modified version under the license terms.
+
 ## Quickstart
 
 The default v0.1 path is local-first and deterministic. It does **not** require a CIShape account, SaaS backend, Jev API key, or GitHub account-wide token.
@@ -45,7 +51,7 @@ CIShape remains read-only: it observes and recommends; it does not rewrite `runs
 See the copy-paste [v0.1 quickstart](docs/quickstart.md) for the complete first-run flow and the optional Jev/capacity layers.
 
 
-A manual-only [release-candidate workflow](docs/release-candidate.md) can produce a locked Linux x86_64 binary, checksum, and provenance manifest without publishing a release. Public distribution remains blocked until the repository license is explicitly selected.
+A manual-only [release-candidate workflow](docs/release-candidate.md) can produce a locked Linux x86_64 binary, checksum, and provenance manifest without publishing a release.
 
 ## POC0
 
