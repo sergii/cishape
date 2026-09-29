@@ -565,6 +565,7 @@ mod tests {
             schema_version: 1,
             snapshot_observed_at: "2026-09-29T00:00:00Z".into(),
             snapshot_source: "test".into(),
+            snapshot_repository_visibility: None,
             target: RunnerShape::new(2_000, 4 * GIB),
             predicted_warm_duration_ms: 10_000,
             evaluations,

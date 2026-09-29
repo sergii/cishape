@@ -1,4 +1,4 @@
-use crate::catalog::ProviderCatalog;
+use crate::catalog::{ProviderCatalog, RepositoryVisibility};
 use crate::economics::{CapacitySnapshot, CapacityState, evaluate_offer};
 use crate::model::RunnerShape;
 use anyhow::{Context, Result};
@@ -154,6 +154,8 @@ pub struct WorkflowEconomicsReport {
     pub workflow_id: String,
     pub snapshot_observed_at: String,
     pub snapshot_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_repository_visibility: Option<RepositoryVisibility>,
     pub evaluations: Vec<WorkflowEconomicsEvaluation>,
     pub skipped: Vec<WorkflowEconomicsSkip>,
 }
@@ -193,7 +195,13 @@ pub fn evaluate(
         let mut rejection = None;
 
         for job in &workflow.jobs {
-            match evaluate_offer(offer, state, &job.target, job.predicted_warm_duration_ms) {
+            match evaluate_offer(
+                offer,
+                state,
+                snapshot.repository_visibility.as_ref(),
+                &job.target,
+                job.predicted_warm_duration_ms,
+            ) {
                 Ok(base) => prepared.push(PreparedJob {
                     effective_runtime_ms: base.effective_runtime_ms,
                     effective_cost_usd: base.effective_cost_usd,
@@ -249,6 +257,7 @@ pub fn evaluate(
         workflow_id: workflow.workflow_id.clone(),
         snapshot_observed_at: snapshot.observed_at.clone(),
         snapshot_source: snapshot.source.clone(),
+        snapshot_repository_visibility: snapshot.repository_visibility.clone(),
         evaluations,
         skipped,
     })
@@ -475,9 +484,13 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
     output.push_str("# CIShape workflow economics\n\n");
     output.push_str(&format!("- Workflow: `{}`\n", report.workflow_id));
     output.push_str(&format!(
-        "- Snapshot: `{}` from `{}`\n\n",
+        "- Snapshot: `{}` from `{}`\n",
         report.snapshot_observed_at, report.snapshot_source
     ));
+    if let Some(visibility) = &report.snapshot_repository_visibility {
+        output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
+    }
+    output.push('\n');
     output.push_str(
         "| Provider | Offer | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
     );

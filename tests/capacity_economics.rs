@@ -1,4 +1,4 @@
-use cishape::catalog::ProviderCatalog;
+use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::economics::{CapacitySnapshot, CostBasis, evaluate};
 use cishape::model::{GIB, RunnerShape};
 use std::path::PathBuf;
@@ -58,4 +58,65 @@ fn deterministic_fixture_compares_managed_and_persistent_capacity() {
     assert_eq!(hetzner.cost_basis, CostBasis::AllocatedFixedCapacity);
     assert!(hetzner.effective_cost_usd < depot.effective_cost_usd);
     assert!(hetzner.pareto_optimal);
+}
+
+#[test]
+fn contextual_offer_requires_matching_snapshot_visibility() {
+    let catalog =
+        ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("provider catalog");
+    let mut snapshot = CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
+        .expect("capacity snapshot");
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.offer_id = "ubuntu-latest-public-x64".into();
+
+    snapshot.repository_visibility = Some(RepositoryVisibility::Public);
+    let public = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("public economics");
+    let public_github = public
+        .evaluations
+        .iter()
+        .find(|item| item.offer_id == "ubuntu-latest-public-x64")
+        .expect("public GitHub offer");
+    assert_eq!(public_github.offer_shape, RunnerShape::new(4_000, 16 * GIB));
+    assert_eq!(public_github.effective_cost_usd, 0.0);
+
+    snapshot.repository_visibility = Some(RepositoryVisibility::Private);
+    let mismatched = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("mismatched economics");
+    assert!(mismatched.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-public-x64"
+            && item
+                .reason
+                .contains("requires public repository visibility")
+    }));
+
+    snapshot.repository_visibility = None;
+    let unknown = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("unknown-context economics");
+    assert!(
+        unknown
+            .skipped
+            .iter()
+            .any(|item| item.offer_id == "ubuntu-latest-public-x64"
+                && item.reason.contains("visibility is unknown"))
+    );
 }

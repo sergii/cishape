@@ -42,7 +42,7 @@ cargo run -- economics-advisory \
   --format markdown
 ```
 
-JSON retains the complete per-job EconomicsReport and EconomicsSelection evidence. Markdown provides the actionable summary.
+JSON retains the complete per-job EconomicsReport and EconomicsSelection evidence. Markdown provides the actionable summary. When the capacity snapshot carries repository visibility, both formats expose it and contextual provider offers are eligible only when that visibility matches.
 
 ## Boundary
 

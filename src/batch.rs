@@ -1,3 +1,4 @@
+use crate::catalog::RepositoryVisibility;
 use crate::economics::{CapacitySnapshot, EconomicsReport};
 use crate::model::RunnerShape;
 use anyhow::Result;
@@ -25,6 +26,8 @@ pub struct BatchEconomicsReport {
     pub schema_version: u32,
     pub snapshot_observed_at: String,
     pub snapshot_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_repository_visibility: Option<RepositoryVisibility>,
     pub target: RunnerShape,
     pub predicted_warm_duration_ms: u64,
     pub parallel_jobs: u32,
@@ -89,6 +92,7 @@ pub fn evaluate(
         schema_version: BATCH_ECONOMICS_REPORT_SCHEMA_VERSION,
         snapshot_observed_at: economics.snapshot_observed_at.clone(),
         snapshot_source: economics.snapshot_source.clone(),
+        snapshot_repository_visibility: economics.snapshot_repository_visibility.clone(),
         target: economics.target.clone(),
         predicted_warm_duration_ms: economics.predicted_warm_duration_ms,
         parallel_jobs,
@@ -192,6 +196,9 @@ fn mark_pareto_frontier(evaluations: &mut [BatchEconomicsEvaluation]) {
 pub fn to_markdown(report: &BatchEconomicsReport) -> String {
     let mut output = String::new();
     output.push_str("## Parallel-job batch\n\n");
+    if let Some(visibility) = &report.snapshot_repository_visibility {
+        output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
+    }
     output.push_str(&format!("- Jobs: {}\n\n", report.parallel_jobs));
     output.push_str("| Provider | Offer | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
     output.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");

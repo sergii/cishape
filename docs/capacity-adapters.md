@@ -4,10 +4,11 @@ CAPACITY5 adds the first live provider adapter while keeping `CapacitySnapshot` 
 
 ## GitHub Actions
 
-The GitHub adapter is read-only. It queries active workflow runs, fetches their latest jobs, filters jobs by an exact requested runner label, and records:
+The GitHub adapter is read-only. It first reads repository metadata to record whether the repository is public or private, then queries active workflow runs, fetches their latest jobs, filters jobs by an exact requested runner label, and records:
 
 - `queue_depth` from matching jobs whose status is `queued`
 - `running_jobs` from matching jobs whose status is `in_progress`
+- top-level `repository_visibility` from GitHub repository metadata
 
 The GitHub API is the observation source, not necessarily the runner provider. The provider remains an explicit input so the same control plane can observe GitHub-hosted, Depot, or self-hosted runner labels without rewriting provider identity.
 
@@ -87,6 +88,8 @@ The adapter paginates both workflow-run and workflow-job reads. It requests only
 GitHub's filtered workflow-run search has a finite search result cap. CIShape fails closed if the reported active-run result set exceeds that cap rather than silently treating a truncated search as complete.
 
 The REST reads are not an atomic provider snapshot. Queue state can move while pages are being collected. `observed_at` records when collection started, and downstream economics should treat every CapacitySnapshot as time-scoped evidence rather than a durable provider fact.
+
+Repository visibility is evidence, not an inference from a runner label or offer ID. Downstream economics compares it with any contextual ProviderCatalog offer and fails closed on missing or mismatched context.
 
 ## Boundary
 
