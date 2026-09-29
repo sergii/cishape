@@ -13,6 +13,7 @@ CapacitySnapshot
   time-scoped runtime facts
   queue depth + running jobs + parallel slots
   slot turnover + utilization + cache state
+  optional repository visibility context
 ```
 
 They combine into:
@@ -51,6 +52,8 @@ A snapshot contains one state per provider offer:
 - `utilization` - productive historical slot utilization, required for fixed servers
 
 The checked-in `examples/capacity-snapshot-v1.json` is synthetic. It exists to make the model reproducible, not to claim current provider queue conditions.
+
+CATALOG3 adds optional `repository_visibility` to the snapshot. Generic provider offers remain valid without it. Context-specific offers such as GitHub's public/private standard `ubuntu-latest` offers require a matching snapshot visibility and are skipped when the context is missing or mismatched. This prevents a valid queue observation from being combined with the wrong capacity/commercial contract.
 
 ## Queue model
 
