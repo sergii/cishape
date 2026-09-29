@@ -22,6 +22,17 @@ CIShape is licensed under the **GNU Affero General Public License v3.0 only** (`
 
 If you modify CIShape and make that modified version available for users to interact with over a network, AGPL section 13 requires offering those users the Corresponding Source of that modified version under the license terms.
 
+## Current release
+
+**v0.1.0** is the first public CIShape release.
+
+- Linux binary package: `x86_64-unknown-linux-gnu`
+- project license: `AGPL-3.0-only`
+- release package includes SHA-256/provenance evidence and third-party license notices
+- source builds remain available for other platforms
+
+See [CIShape v0.1.0](https://github.com/sergii/cishape/releases/tag/v0.1.0).
+
 ## Quickstart
 
 The default v0.1 path is local-first and deterministic. It does **not** require a CIShape account, SaaS backend, Jev API key, or GitHub account-wide token.
