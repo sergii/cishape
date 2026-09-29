@@ -43,6 +43,7 @@ CIShape therefore does not store queue behavior in the provider catalog and does
 
 A snapshot contains one state per provider offer:
 
+- `capacity_scope` - optional concurrency evidence scope (`repository` or `provider_account`) plus a concrete key
 - `queue_depth` - jobs already waiting ahead of the new job
 - `running_jobs` - slots currently occupied
 - `parallel_slots` - effective concurrency available to this workload
@@ -54,6 +55,32 @@ A snapshot contains one state per provider offer:
 The checked-in `examples/capacity-snapshot-v1.json` is synthetic. It exists to make the model reproducible, not to claim current provider queue conditions.
 
 CATALOG3 adds optional `repository_visibility` to the snapshot. Generic provider offers remain valid without it. Context-specific offers such as GitHub's public/private standard `ubuntu-latest` offers require a matching snapshot visibility and are skipped when the context is missing or mismatched. This prevents a valid queue observation from being combined with the wrong capacity/commercial contract.
+
+## Concurrency evidence scope
+
+Queue/running counts and `parallel_slots` are meaningful only when they describe the same concurrency domain.
+
+CAPACITY9 makes that domain explicit:
+
+```text
+capacity_scope:
+  kind: repository | provider_account
+  key: concrete scope identity
+```
+
+A provider catalog offer may declare `required_capacity_scope`. If the runtime state has no scope or a different scope kind, the offer is skipped before queue math runs.
+
+GitHub standard hosted runners require `provider_account` scope because their concurrency limit is not repository-local. A repository-only scan cannot safely combine:
+
+```text
+jobs observed in sergii/cishape
++
+account-wide parallel_slots
+```
+
+as though both covered the same population.
+
+Generic offers remain backward-compatible: when an offer declares no required scope, an old snapshot without `capacity_scope` is still valid.
 
 ## Queue model
 
