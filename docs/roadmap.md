@@ -159,7 +159,7 @@ Next: surface economics-aware advisory results directly in CI.
 
 ## VS8 - Capacity economics
 
-Status: CAPACITY1 through CAPACITY9 implemented.
+Status: CAPACITY1 through CAPACITY10 implemented.
 
 CAPACITY1:
 
@@ -257,7 +257,19 @@ CAPACITY9:
 - preserve scope evidence in single-job, batch, and workflow reports
 - keep account-wide inference out of the repository-only adapter
 
-Next: add an account/org-wide capacity observer where the provider API exposes reliable scope-complete facts, then run the first real account-capacity dogfood proof.
+CAPACITY10:
+
+- add a personal-account GitHub capacity collector
+- authenticate the account and bind it to the target repository owner
+- prove complete owned-repository visibility before emitting provider-account evidence
+- aggregate queued/running GitHub-hosted jobs across every owned repository
+- preserve target repository visibility for public/private contextual offers
+- emit a concrete `github:user:<login>` provider-account scope
+- keep parallel-slot capacity explicit rather than inferring it from GitHub plan defaults
+- fail closed on partial inventory or unreadable repository Actions state
+- leave organization/enterprise scope for a separate completeness model
+
+Next: run the first real personal-account dogfood proof with explicit account concurrency evidence, then package the v0.1 onboarding/advisory experience.
 
 ## VS9 - Cloud ingest
 
