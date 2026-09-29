@@ -1,5 +1,5 @@
-use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
-use cishape::economics::{CapacitySnapshot, CostBasis, evaluate};
+use cishape::catalog::{CapacityScopeKind, ProviderCatalog, RepositoryVisibility};
+use cishape::economics::{CapacityScope, CapacitySnapshot, CostBasis, evaluate};
 use cishape::model::{GIB, RunnerShape};
 use std::path::PathBuf;
 
@@ -119,4 +119,37 @@ fn contextual_offer_requires_matching_snapshot_visibility() {
             .any(|item| item.offer_id == "ubuntu-latest-public-x64"
                 && item.reason.contains("visibility is unknown"))
     );
+}
+
+
+#[test]
+fn account_scoped_offer_rejects_repository_scoped_capacity_evidence() {
+    let catalog =
+        ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("provider catalog");
+    let mut snapshot = CapacitySnapshot::load(&repo_path("examples/capacity-snapshot-v1.json"))
+        .expect("capacity snapshot");
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.scope = Some(CapacityScope {
+        kind: CapacityScopeKind::Repository,
+        key: "sergii/cishape".into(),
+    });
+
+    let report = evaluate(
+        &catalog,
+        &snapshot,
+        &RunnerShape::new(2_000, 4 * GIB),
+        11_000,
+    )
+    .expect("economics report");
+
+    assert!(report.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-private-x64"
+            && item
+                .reason
+                .contains("requires provider_account capacity scope")
+    }));
 }
