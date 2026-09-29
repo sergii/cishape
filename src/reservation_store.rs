@@ -411,7 +411,7 @@ fn persist_terminal_lease(tx: &Transaction<'_>, lease: &ReservationLease) -> Res
     let changed = tx.execute(
         "UPDATE reservation_leases
          SET status = ?, expires_at_unix_ms = ?, lease_json = ?
-         WHERE lease_id = ? AND request_id = ?",
+         WHERE lease_id = ? AND request_id = ? AND status = 'active'",
         params![
             lease_status_name(lease),
             i64::try_from(lease.expires_at_unix_ms).context("lease expiry exceeds DB range")?,
@@ -659,6 +659,43 @@ mod tests {
             store.ledger().expect("ledger").leases[0].status,
             LeaseStatus::Expired
         );
+    }
+
+    #[test]
+    fn failed_lease_insert_rolls_back_worker_cas_mutation() {
+        let mut store = seeded_store();
+        let first = store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("first reserve");
+        assert_eq!(first.outcome, ReservationOutcome::Reserved);
+
+        store
+            .connection
+            .execute_batch(
+                "CREATE UNIQUE INDEX test_one_lease_per_worker
+                 ON reservation_leases(worker_id)",
+            )
+            .expect("test-only uniqueness constraint");
+
+        let before = store.worker("worker-a").expect("before");
+        let mut fresh_admission = admission();
+        fresh_admission.workers[0].state_revision = before.state_revision;
+        let mut second = request("req-2");
+        second.expected_worker_state_revision = before.state_revision;
+
+        let error = store
+            .reserve(&fresh_admission, &second, &policy(), 1_000_100)
+            .unwrap_err();
+
+        assert!(
+            error.to_string().contains("Constraint")
+                || error.to_string().contains("constraint")
+                || error.to_string().contains("unique")
+        );
+        assert_eq!(store.worker("worker-a").expect("after"), before);
+        let ledger = store.ledger().expect("ledger");
+        assert_eq!(ledger.leases.len(), 1);
+        assert_eq!(ledger.leases[0].request_id, "req-1");
     }
 
     #[test]
