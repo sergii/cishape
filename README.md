@@ -310,6 +310,7 @@ See:
 - [Architecture](docs/architecture.md)
 - [RFC-0001](docs/rfc/0001-poc-and-core-model.md)
 - [Roadmap](docs/roadmap.md)
+- [Continuous CI Profiler & Advisor insights](docs/insights/continuous-ci-profiler-advisor.md)
 - [CI strategy](docs/ci.md)
 - [Telemetry model v0](docs/telemetry-model-v0.md)
 - [Portable history](docs/portable-history.md)
