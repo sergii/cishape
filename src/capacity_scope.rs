@@ -31,6 +31,13 @@ impl CapacityScope {
         }
     }
 
+    pub fn provider_account(key: impl Into<String>) -> Self {
+        Self {
+            kind: CapacityScopeKind::ProviderAccount,
+            key: key.into(),
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         anyhow::ensure!(
             !self.key.trim().is_empty(),
