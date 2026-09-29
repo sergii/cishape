@@ -150,6 +150,54 @@ pub struct ExecutionPlan {
     pub sizing_algorithm: String,
 }
 
+impl ExecutionPlan {
+    pub fn load(path: &Path) -> Result<Self> {
+        let bytes =
+            std::fs::read(path).with_context(|| format!("read execution plan {}", path.display()))?;
+        let plan: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse execution plan {}", path.display()))?;
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            self.schema_version == EXECUTION_PLAN_SCHEMA_VERSION,
+            "unsupported execution plan schema version {}",
+            self.schema_version
+        );
+        anyhow::ensure!(!self.planner_version.trim().is_empty(), "planner_version is required");
+        anyhow::ensure!(
+            !self.requirements_id.trim().is_empty(),
+            "requirements_id is required"
+        );
+        anyhow::ensure!(!self.job.trim().is_empty(), "job is required");
+        anyhow::ensure!(
+            self.target_runner.cpu_millis > 0,
+            "target runner CPU must be positive"
+        );
+        anyhow::ensure!(
+            self.target_runner.memory_bytes > 0,
+            "target runner memory must be positive"
+        );
+        anyhow::ensure!(
+            self.predicted_p95_ms.is_finite() && self.predicted_p95_ms >= 0.0,
+            "predicted_p95_ms must be finite and non-negative"
+        );
+        if let Some(max_parallelism) = self.max_parallelism {
+            anyhow::ensure!(max_parallelism > 0, "max_parallelism must be positive");
+        }
+        if let Some(placement) = &self.placement {
+            placement.validate()?;
+        }
+        anyhow::ensure!(
+            !self.sizing_algorithm.trim().is_empty(),
+            "sizing_algorithm is required"
+        );
+        Ok(())
+    }
+}
+
 pub fn plan(
     profile: &JobShape,
     recommendation: &Recommendation,
@@ -172,7 +220,7 @@ pub fn plan(
         (_, MinimumIsolation::Process) => ExecutionEnvironment::Process,
     };
 
-    Ok(ExecutionPlan {
+    let plan = ExecutionPlan {
         schema_version: EXECUTION_PLAN_SCHEMA_VERSION,
         planner_version: EXECUTION_PLANNER_VERSION.into(),
         requirements_id: requirements.requirements_id.clone(),
@@ -187,7 +235,9 @@ pub fn plan(
         max_parallelism: requirements.max_parallelism,
         placement: requirements.placement.clone(),
         sizing_algorithm: recommendation.algorithm.clone(),
-    })
+    };
+    plan.validate()?;
+    Ok(plan)
 }
 
 #[cfg(test)]
