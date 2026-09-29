@@ -119,9 +119,8 @@ pub fn recommend_with_policy(
         .map(|entry| entry.usd_per_minute * profile.duration_p95_ms / 60_000.0);
 
     let recommended_cost = candidate.estimated_p95_cost_usd;
-    let reduction = current_cost.and_then(|cost| {
-        (cost > 0.0).then_some((1.0 - recommended_cost / cost) * 100.0)
-    });
+    let reduction = current_cost
+        .and_then(|cost| (cost > 0.0).then_some((1.0 - recommended_cost / cost) * 100.0));
 
     Some(Recommendation {
         job: profile.job.clone(),
