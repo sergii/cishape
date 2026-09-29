@@ -108,6 +108,9 @@ jobs:
           sha256sum "dist/${PACKAGE}.tar.gz" > "dist/${PACKAGE}.tar.gz.sha256"
 
           archive_sha256="$(awk '{print $1}' "dist/${PACKAGE}.tar.gz.sha256")"
+          license_sha256="$(sha256sum "dist/${PACKAGE}/LICENSE" | awk '{print $1}')"
+          third_party_sha256="$(sha256sum "dist/${PACKAGE}/THIRD_PARTY_LICENSES.html" | awk '{print $1}')"
+
           jq -n \
             --arg schema_version "1" \
             --arg product "cishape" \
@@ -120,6 +123,9 @@ jobs:
             --arg archive "${PACKAGE}.tar.gz" \
             --arg archive_sha256 "${archive_sha256}" \
             --arg lockfile_sha256 "${{ steps.lock.outputs.sha256 }}" \
+            --arg project_license "AGPL-3.0-only" \
+            --arg license_file_sha256 "${license_sha256}" \
+            --arg third_party_licenses_sha256 "${third_party_sha256}" \
             '{
               schema_version: ($schema_version | tonumber),
               product: $product,
@@ -131,7 +137,10 @@ jobs:
               workflow_run_attempt: ($workflow_run_attempt | tonumber),
               archive: $archive,
               archive_sha256: $archive_sha256,
-              lockfile_sha256: $lockfile_sha256
+              lockfile_sha256: $lockfile_sha256,
+              project_license: $project_license,
+              license_file_sha256: $license_file_sha256,
+              third_party_licenses_sha256: $third_party_licenses_sha256
             }' > "dist/${PACKAGE}.manifest.json"
 
           echo "archive=dist/${PACKAGE}.tar.gz" >> "${GITHUB_OUTPUT}"
