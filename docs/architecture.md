@@ -93,11 +93,15 @@ The deterministic optimizer defines the feasible set first. A provider response 
 
 JEV1 has no execution side effects and no required network dependency.
 
-### Execution
+### Execution planning
 
-Execution belongs to the existing CI control plane.
+Execution still belongs to an external CI control plane.
 
-CIShape may eventually emit a recommendation or routing decision consumable by GitHub Actions, Buildkite, or another scheduler, but it does not become a scheduler itself.
+CIShape may emit a provider-neutral advisory `ExecutionPlan` that combines the deterministic RunnerShape recommendation with explicit execution requirements. The plan has no provisioning, runner-registration, scheduling, workflow-mutation, or remote-execution side effects.
+
+Execution environment and tenancy remain separate facets. For example, `microvm + exclusive CPU + shared host` is a valid combination; `dedicated` is not treated as another isolation environment beside process/container/microVM.
+
+Provider/executor binding happens after the advisory plan and belongs to an external control plane. See `docs/execution-planning.md`.
 
 ## Telemetry interoperability
 
