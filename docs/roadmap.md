@@ -345,6 +345,31 @@ Next after LICENSE1: RELEASE2 - rebuild a licensed release candidate, verify its
 
 
 
+## V0.1 public release
+
+Status: RELEASE2 in progress.
+
+Goal:
+
+```text
+AGPL-licensed main
+-> third-party dependency license audit
+-> licensed RC proof
+-> v0.1.0 tag
+-> GitHub Release
+```
+
+RELEASE2:
+
+- pin and checksum-verify cargo-about release tooling
+- fail CI on unresolved/unaccepted dependency licenses
+- generate and package `THIRD_PARTY_LICENSES.html`
+- preserve project `LICENSE`, generated `Cargo.lock`, archive checksum, and provenance
+- prove one licensed Linux x86_64 release candidate
+- publish only `v0.1.0` from an exact main commit
+- attach archive/checksum/provenance to GitHub Release
+- do not publish crates.io or claim additional platform support in this slice
+
 ## VS9 - Cloud ingest
 
 Only after local dogfood proves useful:

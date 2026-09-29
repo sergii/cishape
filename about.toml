@@ -1,0 +1,29 @@
+# CIShape third-party license policy for release artifacts.
+#
+# This list is deliberately explicit. cargo-about fails closed when a dependency
+# cannot be resolved to an accepted license.
+accepted = [
+    "AGPL-3.0-only",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+
+# Dev dependencies are not part of the distributed CIShape executable.
+ignore-dev-dependencies = true
+
+# Build dependencies remain in the audit because they participate in producing
+# the distributed binary and may contribute generated/bundled code.
+ignore-build-dependencies = false
+ignore-transitive-dependencies = false
+
+[ring]
+accepted = ["OpenSSL"]

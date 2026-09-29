@@ -12,7 +12,8 @@ It:
 - requires the dispatch ref to be `main`
 - resolves a fresh dependency lock once for the run, records its SHA-256, then builds `cishape` with `cargo build --release --locked`
 - smoke-tests `cishape --help` and `cishape demo`
-- packages the binary with README, the v0.1 quickstart, the exact dependency lock, and the AGPL license
+- audits third-party dependency licenses with pinned cargo-about tooling
+- packages the binary with README, the v0.1 quickstart, the exact dependency lock, the AGPL license, and generated third-party notices
 - emits a SHA-256 checksum
 - emits a machine-readable provenance manifest
 - uploads the files as a GitHub Actions artifact
@@ -42,6 +43,7 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu/
   README.md
   QUICKSTART.md
   LICENSE
+  THIRD_PARTY_LICENSES.html
   Cargo.lock
 ```
 
@@ -55,6 +57,14 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu.manifest.json
 The manifest records the version, target, repository, exact commit SHA, workflow run/attempt, archive filename/checksum, and the SHA-256 of the generated `Cargo.lock`.
 
 The repository does not yet commit `Cargo.lock`. RELEASE1 therefore freezes the dependency graph at the start of each candidate run and preserves that exact lockfile inside the archive. This makes the produced candidate reconstructable, but a future release-hardening slice should decide whether the application lockfile becomes a committed repository input.
+
+## Third-party license audit
+
+The release path uses `cargo-about 0.9.2` from its pinned Linux release artifact and verifies that tool archive with a checked SHA-256 before execution.
+
+The checked-in `about.toml` is fail-closed: dependencies whose detected licenses are not explicitly accepted stop CI/release packaging for review. The generated `THIRD_PARTY_LICENSES.html` records dependency package names/versions and detected full license texts.
+
+This report is distribution/compliance evidence, not legal advice.
 
 ## Verify locally
 

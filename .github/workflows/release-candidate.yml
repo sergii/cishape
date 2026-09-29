@@ -75,6 +75,9 @@ jobs:
           shared-key: cishape-release
           key: duckdb-1.10505.0
 
+      - name: Generate third-party license notices
+        run: bash scripts/generate-third-party-licenses.sh .cishape/release/THIRD_PARTY_LICENSES.html
+
       - name: Build locked release binary
         run: cargo build --release --locked --bin cishape
 
@@ -98,6 +101,7 @@ jobs:
           cp README.md "dist/${PACKAGE}/README.md"
           cp docs/quickstart.md "dist/${PACKAGE}/QUICKSTART.md"
           cp LICENSE "dist/${PACKAGE}/LICENSE"
+          cp .cishape/release/THIRD_PARTY_LICENSES.html "dist/${PACKAGE}/THIRD_PARTY_LICENSES.html"
           cp Cargo.lock "dist/${PACKAGE}/Cargo.lock"
 
           tar -C dist -czf "dist/${PACKAGE}.tar.gz" "${PACKAGE}"

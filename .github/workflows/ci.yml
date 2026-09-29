@@ -50,6 +50,9 @@ jobs:
           key: duckdb-1.10505.0
           cache-on-failure: true
 
+      - name: Audit third-party licenses
+        run: bash scripts/generate-third-party-licenses.sh .cishape/licenses/THIRD_PARTY_LICENSES.html
+
       # Build the observer once, then use that binary for the workloads below.
       - name: Build CIShape observer
         run: cargo build --locked --bin cishape
