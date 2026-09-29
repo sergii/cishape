@@ -200,8 +200,8 @@ pub struct BindingReport {
 
 impl BindingReport {
     pub fn load(path: &Path) -> Result<Self> {
-        let bytes =
-            std::fs::read(path).with_context(|| format!("read binding report {}", path.display()))?;
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read binding report {}", path.display()))?;
         let report: Self = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse binding report {}", path.display()))?;
         report.validate()?;
@@ -214,7 +214,10 @@ impl BindingReport {
             "unsupported binding report schema version {}",
             self.schema_version
         );
-        anyhow::ensure!(!self.algorithm.trim().is_empty(), "binding algorithm is required");
+        anyhow::ensure!(
+            !self.algorithm.trim().is_empty(),
+            "binding algorithm is required"
+        );
         anyhow::ensure!(!self.catalog_id.trim().is_empty(), "catalog_id is required");
         anyhow::ensure!(!self.job.trim().is_empty(), "binding job is required");
         self.plan.validate()?;
