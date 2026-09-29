@@ -1,4 +1,4 @@
-use crate::catalog::ProviderCatalog;
+use crate::catalog::{ProviderCatalog, RepositoryVisibility};
 use crate::economics::{CapacitySnapshot, EconomicsReport, evaluate as evaluate_economics};
 use crate::economics_policy::{EconomicsPolicy, EconomicsSelection, select as select_economics};
 use crate::model::{JobShape, RunnerShape};
@@ -61,6 +61,8 @@ pub struct EconomicsAdvisoryReport {
     pub catalog_observed_at: String,
     pub snapshot_observed_at: String,
     pub snapshot_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_repository_visibility: Option<RepositoryVisibility>,
     pub items: Vec<EconomicsAdvisoryItem>,
 }
 
@@ -104,6 +106,7 @@ pub fn build_report(
         catalog_observed_at: catalog.observed_at.clone(),
         snapshot_observed_at: snapshot.observed_at.clone(),
         snapshot_source: snapshot.source.clone(),
+        snapshot_repository_visibility: snapshot.repository_visibility.clone(),
         items,
     })
 }
@@ -208,6 +211,9 @@ pub fn to_markdown(report: &EconomicsAdvisoryReport) -> String {
         "- Capacity snapshot: `{}` from `{}`\n",
         report.snapshot_observed_at, report.snapshot_source
     ));
+    if let Some(visibility) = &report.snapshot_repository_visibility {
+        output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
+    }
     output.push_str(&format!("- Minimum evidence: {} runs\n", report.min_runs));
     output.push_str("- Advisory only - no CI execution changes are made.\n\n");
 
