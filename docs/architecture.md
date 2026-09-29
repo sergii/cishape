@@ -103,6 +103,17 @@ Execution environment and tenancy remain separate facets. For example, `microvm 
 
 Provider/executor binding happens after the advisory plan and belongs to an external control plane. See `docs/execution-planning.md`.
 
+
+### Executor capability binding
+
+CIShape may compare an `ExecutionPlan` with a versioned static `ExecutorCatalog` and emit a side-effect-free `BindingReport`.
+
+The catalog describes capability envelopes such as supported environment, maximum allocatable CPU/RAM, tenancy modes, architecture, capabilities, and cache modes. It must not contain live queue depth, current free resources, worker liveness, current cache warmth, or scheduling priority.
+
+BINDING1 returns all compatible targets with explicit exclusion reasons. It does not select a winner when multiple targets fit. Selection requires separate live evidence and an explicit policy.
+
+See `docs/execution-binding.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.

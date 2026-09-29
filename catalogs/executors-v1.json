@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "catalog_id": "executors-v1-example",
+  "targets": [
+    {
+      "executor_id": "local-process-x86_64",
+      "environments": ["process"],
+      "max_runner": {
+        "cpu_millis": 8000,
+        "memory_bytes": 17179869184
+      },
+      "cpu_tenancy": ["shared"],
+      "host_tenancy": ["shared"],
+      "architectures": ["x86_64"],
+      "capabilities": ["linux"],
+      "cache_modes": ["ephemeral", "persistent"]
+    },
+    {
+      "executor_id": "container-pool-x86_64",
+      "environments": ["container"],
+      "max_runner": {
+        "cpu_millis": 16000,
+        "memory_bytes": 68719476736
+      },
+      "cpu_tenancy": ["shared", "exclusive"],
+      "host_tenancy": ["shared"],
+      "architectures": ["x86_64"],
+      "capabilities": ["linux", "container"],
+      "cache_modes": ["ephemeral", "persistent"]
+    },
+    {
+      "executor_id": "boxd-like-microvm-x86_64",
+      "environments": ["microvm"],
+      "max_runner": {
+        "cpu_millis": 16000,
+        "memory_bytes": 68719476736
+      },
+      "cpu_tenancy": ["shared", "exclusive"],
+      "host_tenancy": ["shared"],
+      "architectures": ["x86_64"],
+      "capabilities": ["linux", "microvm"],
+      "cache_modes": ["ephemeral", "persistent"]
+    },
+    {
+      "executor_id": "firecracker-like-microvm-x86_64",
+      "environments": ["microvm"],
+      "max_runner": {
+        "cpu_millis": 32000,
+        "memory_bytes": 137438953472
+      },
+      "cpu_tenancy": ["shared", "exclusive"],
+      "host_tenancy": ["shared"],
+      "architectures": ["x86_64"],
+      "capabilities": ["linux", "microvm"],
+      "cache_modes": ["ephemeral", "persistent"]
+    },
+    {
+      "executor_id": "byoc-dedicated-x86_64",
+      "environments": ["container", "microvm"],
+      "max_runner": {
+        "cpu_millis": 32000,
+        "memory_bytes": 137438953472
+      },
+      "cpu_tenancy": ["shared", "exclusive"],
+      "host_tenancy": ["shared", "dedicated"],
+      "architectures": ["x86_64"],
+      "capabilities": ["linux", "microvm", "dedicated-host"],
+      "cache_modes": ["ephemeral", "persistent"]
+    }
+  ]
+}

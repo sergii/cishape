@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::batch::evaluate as evaluate_batch_economics;
+use cishape::binding::{ExecutorCatalog, fit as fit_execution};
 use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
@@ -395,6 +396,15 @@ enum Command {
         output: Option<PathBuf>,
         job: String,
     },
+    /// Fit a portable ExecutionPlan to static executor capabilities without scheduling.
+    ExecutionFit {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long, default_value = "catalogs/executors-v1.json")]
+        catalog: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -653,6 +663,11 @@ fn main() -> Result<()> {
             &requirements,
             output.as_deref(),
         ),
+        Command::ExecutionFit {
+            plan,
+            catalog,
+            output,
+        } => execution_fit_command(&plan, &catalog, output.as_deref()),
         Command::Explain {
             db,
             repository,
@@ -1316,6 +1331,28 @@ fn execution_plan_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote execution plan to {}", path.display());
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn execution_fit_command(
+    plan_path: &Path,
+    catalog_path: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
+    let plan = cishape::execution::ExecutionPlan::load(plan_path)?;
+    let catalog = ExecutorCatalog::load(catalog_path)?;
+    let report = fit_execution(&plan, &catalog)?;
+    let payload = serde_json::to_string_pretty(&report).context("serialize BindingReport")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote execution binding report to {}", path.display());
     } else {
         println!("{payload}");
     }

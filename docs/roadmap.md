@@ -468,6 +468,31 @@ EXECUTION1:
 - emit portable deterministic JSON for a future external scheduler/executor
 - defer Firecracker, boxd, Kubernetes, provider binding, runner registration, provisioning, and automatic routing
 
+## VS10.6 - Executor capability binding
+
+Status: BINDING1 implemented.
+
+Goal:
+
+```text
+ExecutionPlan
+  + static ExecutorCatalog
+  -> BindingReport
+  -> compatible executor set + exclusion evidence
+```
+
+BINDING1:
+
+- model static executor capability envelopes separately from provider pricing and live capacity
+- check environment, CPU/RAM, tenancy, architecture, required capabilities, and cache requirements
+- treat warm cache as a preference/capability hint rather than a claim about current runtime state
+- return all compatible targets in stable deterministic order
+- emit structured reasons for every incompatible target
+- do not select a winner without live evidence and explicit policy
+- keep provisioning, reservation, worker liveness, runner registration, and scheduling out of this slice
+
+Next execution-plane step: add live worker/pool state and admission evidence before any scheduling or reservation behavior.
+
 ## VS11 - Controlled routing
 
-Only after advisory recommendations and execution plans prove reliable, allow opt-in automation through existing CI control planes.
+Only after advisory recommendations, execution plans, capability binding, and live capacity evidence prove reliable, allow opt-in automation through existing CI control planes.
