@@ -58,6 +58,10 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - Keep provider-offer queue/economics capacity separate from concrete worker/host runtime state. CapacitySnapshot and WorkerStateSnapshot answer different questions.
 - Worker physical capacity, configured allocation limits, and current allocations are distinct evidence. Never infer an oversubscription ratio from physical CPU count.
 - Worker pressure observations are evidence only until an explicit versioned admission policy defines thresholds and behavior.
+- Binding evidence consumed by admission must be tied to the exact ExecutionPlan; reject stale/mismatched binding artifacts even when job/repository identity matches.
+- Admission capacity basis, reserves, and pressure thresholds must come from versioned policy data. Do not silently treat allocation limits above physical capacity as usable oversubscription.
+- An admission result is advisory snapshot-time eligibility, not a reservation. Never start execution from admission evidence without a later atomic reservation/lease step that prevents double allocation.
+- Exclusive CPU admission must fail closed until worker evidence can prove reservable exclusive cores; free aggregate CPU millis are insufficient.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence
