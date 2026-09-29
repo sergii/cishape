@@ -496,15 +496,21 @@ pub fn to_markdown(report: &WorkflowEconomicsReport) -> String {
     }
     output.push('\n');
     output.push_str(
-        "| Provider | Offer | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
+        "| Provider | Offer | Scope | Slots | Critical path | Time-to-green | Total cost | Pareto |\n",
     );
-    output.push_str("| --- | --- | ---: | ---: | ---: | ---: | --- |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
+        let scope = evaluation
+            .capacity_scope
+            .as_ref()
+            .map(|scope| format!("{}:{}", scope.kind, scope.key))
+            .unwrap_or_else(|| "-".into());
         output.push_str(&format!(
-            "| {} | {} | {} | {:.2}s | {:.2}s | ${:.6} | {} |\n",
+            "| {} | {} | {} | {} | {:.2}s | {:.2}s | ${:.6} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            scope,
             evaluation.parallel_slots,
             evaluation.critical_path_ms as f64 / 1000.0,
             evaluation.time_to_green_ms as f64 / 1000.0,
