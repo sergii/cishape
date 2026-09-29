@@ -2,6 +2,12 @@
 
 CIShape is early-stage. Small, reviewable changes that preserve the architecture boundaries are preferred.
 
+## License of contributions
+
+CIShape is distributed under `AGPL-3.0-only`.
+
+By submitting a contribution to this repository, you agree that your contribution may be distributed under the same `AGPL-3.0-only` license as the project, unless a different arrangement is explicitly agreed in writing before the contribution is accepted.
+
 ## Development
 
 Requirements:
