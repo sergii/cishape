@@ -82,6 +82,22 @@ The repository does not yet declare a redistribution license.
 
 Therefore RELEASE1 is a **build/provenance proof**, not a public distribution release. The workflow artifact is useful for validating packaging and reproducibility, but the project should not create a public GitHub Release or publish to a package registry until the license decision is explicit.
 
+## Proven release candidate
+
+The first successful proof is Release Candidate #2 from commit:
+
+```text
+520426443708b07c6201f5e5fbe7640cf5262672
+```
+
+The workflow completed the dependency lock, locked release build, smoke test, packaging, checksum/provenance generation, and artifact upload. The uploaded artifact was:
+
+```text
+cishape-v0.1.0-x86_64-unknown-linux-gnu-rc-36510349471-1
+```
+
+This proves the non-publishing Linux v0.1 candidate pipeline end to end.
+
 ## Follow-up
 
 A later RELEASE2 may add:
