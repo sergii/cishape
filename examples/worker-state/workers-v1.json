@@ -1,11 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "observed_at": "2026-09-29T15:00:00Z",
   "source": "example-fixture",
   "workers": [
     {
       "worker_id": "worker-a",
       "executor_id": "firecracker-like-microvm-x86_64",
+      "state_revision": 7,
       "lifecycle": "ready",
       "physical_capacity": {
         "cpu_millis": 32000,
@@ -19,7 +20,12 @@
         "cpu_millis": 20000,
         "memory_bytes": 42949672960
       },
+      "reserved_capacity": {
+        "cpu_millis": 0,
+        "memory_bytes": 0
+      },
       "running_allocations": 6,
+      "reserved_allocations": 0,
       "max_allocations": 16,
       "pressure": {
         "cpu_utilization_ratio": 0.42,
@@ -30,6 +36,7 @@
     {
       "worker_id": "worker-b",
       "executor_id": "boxd-like-microvm-x86_64",
+      "state_revision": 11,
       "lifecycle": "draining",
       "physical_capacity": {
         "cpu_millis": 16000,
@@ -43,7 +50,12 @@
         "cpu_millis": 8000,
         "memory_bytes": 17179869184
       },
+      "reserved_capacity": {
+        "cpu_millis": 2000,
+        "memory_bytes": 4294967296
+      },
       "running_allocations": 3,
+      "reserved_allocations": 1,
       "max_allocations": 8,
       "pressure": {
         "cpu_utilization_ratio": 0.36,
@@ -53,6 +65,7 @@
     {
       "worker_id": "worker-c",
       "executor_id": "byoc-dedicated-x86_64",
+      "state_revision": 3,
       "lifecycle": "offline",
       "physical_capacity": {
         "cpu_millis": 32000,
@@ -66,7 +79,12 @@
         "cpu_millis": 0,
         "memory_bytes": 0
       },
+      "reserved_capacity": {
+        "cpu_millis": 0,
+        "memory_bytes": 0
+      },
       "running_allocations": 0,
+      "reserved_allocations": 0,
       "max_allocations": 8
     }
   ]
