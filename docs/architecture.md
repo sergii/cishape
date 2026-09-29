@@ -114,6 +114,21 @@ BINDING1 returns all compatible targets with explicit exclusion reasons. It does
 
 See `docs/execution-binding.md`.
 
+
+### Worker runtime state
+
+Concrete execution-worker state is modeled separately from both static executor capabilities and provider-offer queue economics.
+
+`WorkerStateSnapshot` records concrete worker identity, executor identity, physical capacity, explicit allocation limits, current allocations, lifecycle, allocation-count ceilings, and optional pressure evidence.
+
+`physical_capacity` and `allocation_limit` are intentionally distinct. A configured allocation limit may be above or below physical capacity, but CIShape must not infer or invent an oversubscription factor.
+
+The existing `CapacitySnapshot` remains the provider-offer queue/economics model. It is not reused as host scheduler state.
+
+WORKERSTATE1 derives free allocation capacity and whether a worker is structurally accepting any new work, but it does not decide whether a specific ExecutionPlan should be admitted.
+
+See `docs/worker-state.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.
