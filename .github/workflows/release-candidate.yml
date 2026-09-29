@@ -1,0 +1,155 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cishape-release-candidate
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_PROFILE_RELEASE_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  linux-x86_64:
+    name: linux-x86_64
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout dispatch commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          set -euo pipefail
+
+          host="$(rustc -vV | awk '/^host:/ {print $2}')"
+          if [ "${host}" != "x86_64-unknown-linux-gnu" ]; then
+            echo "Unexpected runner target: ${host}" >&2
+            exit 1
+          fi
+
+          version="$(
+            cargo metadata --no-deps --format-version 1 |
+              jq -r '.packages[] | select(.name == "cishape") | .version'
+          )"
+          if [ -z "${version}" ] || [ "${version}" = "null" ]; then
+            echo "Could not resolve cishape version from Cargo metadata." >&2
+            exit 1
+          fi
+
+          package="cishape-v${version}-${host}"
+
+          echo "host=${host}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "package=${package}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: cishape-release
+          key: duckdb-1.10505.0
+
+      - name: Build locked release binary
+        run: cargo build --release --locked --bin cishape
+
+      - name: Smoke release binary
+        run: |
+          set -euo pipefail
+          target/release/cishape --help >/dev/null
+          target/release/cishape demo >/dev/null
+
+      - name: Package release candidate
+        id: package
+        env:
+          PACKAGE: ${{ steps.meta.outputs.package }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          TARGET: ${{ steps.meta.outputs.host }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "dist/${PACKAGE}"
+          cp target/release/cishape "dist/${PACKAGE}/cishape"
+          cp README.md "dist/${PACKAGE}/README.md"
+          cp docs/quickstart.md "dist/${PACKAGE}/QUICKSTART.md"
+
+          tar -C dist -czf "dist/${PACKAGE}.tar.gz" "${PACKAGE}"
+          sha256sum "dist/${PACKAGE}.tar.gz" > "dist/${PACKAGE}.tar.gz.sha256"
+
+          archive_sha256="$(awk '{print $1}' "dist/${PACKAGE}.tar.gz.sha256")"
+          jq -n \
+            --arg schema_version "1" \
+            --arg product "cishape" \
+            --arg version "${VERSION}" \
+            --arg target "${TARGET}" \
+            --arg commit_sha "${GITHUB_SHA}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg workflow_run_id "${GITHUB_RUN_ID}" \
+            --arg workflow_run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg archive "${PACKAGE}.tar.gz" \
+            --arg archive_sha256 "${archive_sha256}" \
+            '{
+              schema_version: ($schema_version | tonumber),
+              product: $product,
+              version: $version,
+              target: $target,
+              commit_sha: $commit_sha,
+              repository: $repository,
+              workflow_run_id: $workflow_run_id,
+              workflow_run_attempt: ($workflow_run_attempt | tonumber),
+              archive: $archive,
+              archive_sha256: $archive_sha256
+            }' > "dist/${PACKAGE}.manifest.json"
+
+          echo "archive=dist/${PACKAGE}.tar.gz" >> "${GITHUB_OUTPUT}"
+          echo "checksum=dist/${PACKAGE}.tar.gz.sha256" >> "${GITHUB_OUTPUT}"
+          echo "manifest=dist/${PACKAGE}.manifest.json" >> "${GITHUB_OUTPUT}"
+
+      - name: Summarize release candidate
+        env:
+          PACKAGE: ${{ steps.meta.outputs.package }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          TARGET: ${{ steps.meta.outputs.host }}
+        run: |
+          {
+            echo "## CIShape v${VERSION} release candidate"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Target | \`${TARGET}\` |"
+            echo "| Archive | \`${PACKAGE}.tar.gz\` |"
+            echo "| Published | no |"
+            echo
+            echo "This workflow only builds and uploads an internal workflow artifact. It does not create a tag, GitHub Release, crates.io publish, or deployment."
+            echo
+            echo "Public publishing remains blocked until the repository license boundary is explicitly decided."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cishape-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.host }}-rc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+            ${{ steps.package.outputs.manifest }}
+          if-no-files-found: error
+          retention-days: 30
