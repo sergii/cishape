@@ -16,6 +16,8 @@ CPU and memory remain separate dimensions. External machine-readable IDs use low
 
 ## License
 
+Copyright © 2026 Serhii Ponomarov.
+
 CIShape is licensed under the **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`). See [LICENSE](LICENSE).
 
 If you modify CIShape and make that modified version available for users to interact with over a network, AGPL section 13 requires offering those users the Corresponding Source of that modified version under the license terms.
