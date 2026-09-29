@@ -9,6 +9,7 @@ The GitHub adapter is read-only. It first reads repository metadata to record wh
 - `queue_depth` from matching jobs whose status is `queued`
 - `running_jobs` from matching jobs whose status is `in_progress`
 - top-level `repository_visibility` from GitHub repository metadata
+- per-state `capacity_scope = repository:<owner/repo>` because this adapter scans exactly one repository
 
 The GitHub API is the observation source, not necessarily the runner provider. The provider remains an explicit input so the same control plane can observe GitHub-hosted, Depot, or self-hosted runner labels without rewriting provider identity.
 
@@ -90,6 +91,14 @@ GitHub's filtered workflow-run search has a finite search result cap. CIShape fa
 The REST reads are not an atomic provider snapshot. Queue state can move while pages are being collected. `observed_at` records when collection started, and downstream economics should treat every CapacitySnapshot as time-scoped evidence rather than a durable provider fact.
 
 Repository visibility is evidence, not an inference from a runner label or offer ID. Downstream economics compares it with any contextual ProviderCatalog offer and fails closed on missing or mismatched context.
+
+## Scope boundary
+
+The current GitHub adapter is deliberately repository-scoped. It does **not** pretend that one repository's queued/running jobs represent an account-wide or organization-wide concurrency pool.
+
+That matters for standard GitHub-hosted runners: their provider catalog offers require `provider_account` capacity evidence. Therefore a snapshot produced by the current repository scanner will be rejected for those offers even when the repository visibility matches.
+
+The next live-proof adapter must observe the same provider-account scope as the supplied concurrency limit. Until that observer exists, CIShape fails closed instead of extrapolating account-wide pressure from one repository.
 
 ## Boundary
 
