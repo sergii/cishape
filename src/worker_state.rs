@@ -282,7 +282,7 @@ mod tests {
         let mut worker = ready_worker("worker-a");
         worker.running_allocations = worker.max_allocations;
 
-        assert!(!worker.accepting_new_work());
+        assert!(!worker.accepting_new_work().expect("accepting state"));
     }
 
     #[test]
