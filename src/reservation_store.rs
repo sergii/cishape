@@ -1,4 +1,9 @@
 use crate::admission::AdmissionReport;
+use crate::executor::{
+    ExecutionCompletion, ExecutionRecord, ExecutionStatus,
+    claim_execution as claim_execution_domain, finish_execution as finish_execution_domain,
+    mark_running as mark_execution_running_domain,
+};
 use crate::reservation::{
     ReservationLease, ReservationLedger, ReservationOutcome, ReservationPolicy, ReservationRequest,
     ReservationTransition, expire_due as expire_transition, release as release_transition,
@@ -22,6 +27,27 @@ pub trait ReservationStore {
     ) -> Result<ReservationTransition>;
     fn release(&mut self, lease_id: &str, now_unix_ms: u64) -> Result<ReservationTransition>;
     fn expire_due(&mut self, worker_id: &str, now_unix_ms: u64) -> Result<ReservationTransition>;
+    fn execution(&self, execution_id: &str) -> Result<ExecutionRecord>;
+    fn claim_execution(
+        &mut self,
+        lease_id: &str,
+        execution_id: &str,
+        backend: &str,
+        command: &[String],
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord>;
+    fn mark_execution_running(
+        &mut self,
+        execution_id: &str,
+        backend_resource_id: &str,
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord>;
+    fn finish_execution(
+        &mut self,
+        execution_id: &str,
+        completion: &ExecutionCompletion,
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord>;
 }
 
 pub struct DuckDbReservationStore {
@@ -62,6 +88,15 @@ impl DuckDbReservationStore {
                 status VARCHAR NOT NULL,
                 expires_at_unix_ms BIGINT NOT NULL,
                 lease_json VARCHAR NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS executions (
+                execution_id VARCHAR PRIMARY KEY,
+                lease_id VARCHAR NOT NULL UNIQUE,
+                worker_id VARCHAR NOT NULL,
+                backend VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                execution_json VARCHAR NOT NULL
             );
             "#,
         )?;
@@ -227,6 +262,263 @@ impl ReservationStore for DuckDbReservationStore {
         tx.commit()?;
         Ok(transition)
     }
+
+    fn execution(&self, execution_id: &str) -> Result<ExecutionRecord> {
+        anyhow::ensure!(!execution_id.trim().is_empty(), "execution_id is required");
+        load_execution_from_connection(&self.connection, execution_id)
+    }
+
+    fn claim_execution(
+        &mut self,
+        lease_id: &str,
+        execution_id: &str,
+        backend: &str,
+        command: &[String],
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord> {
+        anyhow::ensure!(!lease_id.trim().is_empty(), "lease_id is required");
+        anyhow::ensure!(!execution_id.trim().is_empty(), "execution_id is required");
+
+        let tx = self.connection.transaction()?;
+        if let Some(existing) = load_execution_optional_from_tx(&tx, execution_id)? {
+            anyhow::ensure!(
+                existing.lease_id == lease_id
+                    && existing.backend == backend
+                    && existing.command == command,
+                "execution_id {execution_id} conflicts with an existing execution"
+            );
+            tx.commit()?;
+            return Ok(existing);
+        }
+
+        anyhow::ensure!(
+            load_execution_by_lease_from_tx(&tx, lease_id)?.is_none(),
+            "lease {lease_id} already belongs to another execution"
+        );
+
+        let ledger = load_ledger_from_tx(&tx)?;
+        let lease = ledger
+            .leases
+            .iter()
+            .find(|lease| lease.lease_id == lease_id)
+            .with_context(|| format!("lease {lease_id} not found"))?;
+        let worker = load_worker_from_tx(&tx, &lease.worker_id)?
+            .with_context(|| format!("worker {} not found", lease.worker_id))?;
+
+        let transition =
+            claim_execution_domain(&worker, lease, execution_id, backend, command, now_unix_ms)?;
+
+        persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
+        persist_terminal_lease(&tx, &transition.lease_after)?;
+        insert_execution(&tx, &transition.execution)?;
+
+        tx.commit()?;
+        Ok(transition.execution)
+    }
+
+    fn mark_execution_running(
+        &mut self,
+        execution_id: &str,
+        backend_resource_id: &str,
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord> {
+        let tx = self.connection.transaction()?;
+        let execution = load_execution_from_tx(&tx, execution_id)?;
+
+        if execution.status == ExecutionStatus::Running {
+            anyhow::ensure!(
+                execution.backend_resource_id.as_deref() == Some(backend_resource_id),
+                "execution {execution_id} is already running on a different backend resource"
+            );
+            tx.commit()?;
+            return Ok(execution);
+        }
+        anyhow::ensure!(
+            !execution.terminal(),
+            "execution {execution_id} is already terminal"
+        );
+
+        let next = mark_execution_running_domain(&execution, backend_resource_id, now_unix_ms)?;
+        persist_execution_status(&tx, &next, "starting")?;
+        tx.commit()?;
+        Ok(next)
+    }
+
+    fn finish_execution(
+        &mut self,
+        execution_id: &str,
+        completion: &ExecutionCompletion,
+        now_unix_ms: u64,
+    ) -> Result<ExecutionRecord> {
+        let tx = self.connection.transaction()?;
+        let execution = load_execution_from_tx(&tx, execution_id)?;
+        if execution.terminal() {
+            tx.commit()?;
+            return Ok(execution);
+        }
+
+        let worker = load_worker_from_tx(&tx, &execution.worker_id)?
+            .with_context(|| format!("worker {} not found", execution.worker_id))?;
+        let transition = finish_execution_domain(&worker, &execution, completion, now_unix_ms)?;
+
+        persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
+        persist_execution_status(
+            &tx,
+            &transition.execution_after,
+            execution_status_name(&execution),
+        )?;
+        tx.commit()?;
+        Ok(transition.execution_after)
+    }
+}
+
+fn load_execution_from_connection(
+    connection: &Connection,
+    execution_id: &str,
+) -> Result<ExecutionRecord> {
+    let mut statement = connection.prepare(
+        "SELECT lease_id, worker_id, backend, status, execution_json
+         FROM executions
+         WHERE execution_id = ?",
+    )?;
+    let rows = statement.query_map(params![execution_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    let records = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+    decode_execution_record(execution_id, records)
+}
+
+fn load_execution_from_tx(tx: &Transaction<'_>, execution_id: &str) -> Result<ExecutionRecord> {
+    load_execution_optional_from_tx(tx, execution_id)?
+        .with_context(|| format!("execution {execution_id} not found"))
+}
+
+fn load_execution_optional_from_tx(
+    tx: &Transaction<'_>,
+    execution_id: &str,
+) -> Result<Option<ExecutionRecord>> {
+    let mut statement = tx.prepare(
+        "SELECT lease_id, worker_id, backend, status, execution_json
+         FROM executions
+         WHERE execution_id = ?",
+    )?;
+    let rows = statement.query_map(params![execution_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    let records = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+    if records.is_empty() {
+        return Ok(None);
+    }
+    decode_execution_record(execution_id, records).map(Some)
+}
+
+fn load_execution_by_lease_from_tx(
+    tx: &Transaction<'_>,
+    lease_id: &str,
+) -> Result<Option<ExecutionRecord>> {
+    let mut statement = tx.prepare(
+        "SELECT execution_id, lease_id, worker_id, backend, status, execution_json
+         FROM executions
+         WHERE lease_id = ?",
+    )?;
+    let rows = statement.query_map(params![lease_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, String>(5)?,
+        ))
+    })?;
+    let records = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+    anyhow::ensure!(
+        records.len() <= 1,
+        "lease {lease_id} maps to multiple executions"
+    );
+    let Some((execution_id, lease_id, worker_id, backend, status, json)) =
+        records.into_iter().next()
+    else {
+        return Ok(None);
+    };
+    decode_execution_fields(
+        &execution_id,
+        &lease_id,
+        &worker_id,
+        &backend,
+        &status,
+        &json,
+    )
+    .map(Some)
+}
+
+fn decode_execution_record(
+    execution_id: &str,
+    records: Vec<(String, String, String, String, String)>,
+) -> Result<ExecutionRecord> {
+    anyhow::ensure!(
+        records.len() == 1,
+        "expected exactly one execution row for {execution_id}, found {}",
+        records.len()
+    );
+    let (lease_id, worker_id, backend, status, json) = records
+        .into_iter()
+        .next()
+        .context("execution row missing")?;
+    decode_execution_fields(
+        execution_id,
+        &lease_id,
+        &worker_id,
+        &backend,
+        &status,
+        &json,
+    )
+}
+
+fn decode_execution_fields(
+    execution_id: &str,
+    lease_id: &str,
+    worker_id: &str,
+    backend: &str,
+    status: &str,
+    json: &str,
+) -> Result<ExecutionRecord> {
+    let execution: ExecutionRecord =
+        serde_json::from_str(json).context("parse authoritative ExecutionRecord JSON")?;
+    execution.validate()?;
+    anyhow::ensure!(
+        execution.execution_id == execution_id,
+        "execution JSON execution_id mismatch"
+    );
+    anyhow::ensure!(
+        execution.lease_id == lease_id,
+        "execution JSON lease_id mismatch"
+    );
+    anyhow::ensure!(
+        execution.worker_id == worker_id,
+        "execution JSON worker_id mismatch"
+    );
+    anyhow::ensure!(
+        execution.backend == backend,
+        "execution JSON backend mismatch"
+    );
+    anyhow::ensure!(
+        execution_status_name(&execution) == status,
+        "execution JSON status mismatch"
+    );
+    Ok(execution)
 }
 
 fn load_worker_from_tx(tx: &Transaction<'_>, worker_id: &str) -> Result<Option<WorkerState>> {
@@ -382,6 +674,62 @@ fn persist_worker_cas(
     Ok(())
 }
 
+fn insert_execution(tx: &Transaction<'_>, execution: &ExecutionRecord) -> Result<()> {
+    execution.validate()?;
+    let json = serde_json::to_string(execution).context("serialize ExecutionRecord")?;
+    let changed = tx.execute(
+        "INSERT INTO executions (
+            execution_id, lease_id, worker_id, backend, status, execution_json
+         ) VALUES (?, ?, ?, ?, ?, ?)",
+        params![
+            execution.execution_id,
+            execution.lease_id,
+            execution.worker_id,
+            execution.backend,
+            execution_status_name(execution),
+            json
+        ],
+    )?;
+    anyhow::ensure!(changed == 1, "failed to insert execution");
+    Ok(())
+}
+
+fn persist_execution_status(
+    tx: &Transaction<'_>,
+    execution: &ExecutionRecord,
+    expected_status: &str,
+) -> Result<()> {
+    execution.validate()?;
+    let json = serde_json::to_string(execution).context("serialize ExecutionRecord")?;
+    let changed = tx.execute(
+        "UPDATE executions
+         SET status = ?, execution_json = ?
+         WHERE execution_id = ? AND status = ?",
+        params![
+            execution_status_name(execution),
+            json,
+            execution.execution_id,
+            expected_status
+        ],
+    )?;
+    anyhow::ensure!(
+        changed == 1,
+        "execution CAS failed for {} at status {}",
+        execution.execution_id,
+        expected_status
+    );
+    Ok(())
+}
+
+fn execution_status_name(execution: &ExecutionRecord) -> &'static str {
+    match execution.status {
+        ExecutionStatus::Starting => "starting",
+        ExecutionStatus::Running => "running",
+        ExecutionStatus::Succeeded => "succeeded",
+        ExecutionStatus::Failed => "failed",
+    }
+}
+
 fn insert_lease(tx: &Transaction<'_>, lease: &ReservationLease) -> Result<()> {
     let json = serde_json::to_string(lease).context("serialize ReservationLease")?;
     let changed = tx.execute(
@@ -426,6 +774,7 @@ fn persist_terminal_lease(tx: &Transaction<'_>, lease: &ReservationLease) -> Res
 fn lease_status_name(lease: &ReservationLease) -> &'static str {
     match &lease.status {
         crate::reservation::LeaseStatus::Active => "active",
+        crate::reservation::LeaseStatus::Claimed => "claimed",
         crate::reservation::LeaseStatus::Released => "released",
         crate::reservation::LeaseStatus::Expired => "expired",
     }
@@ -694,6 +1043,111 @@ mod tests {
         let ledger = store.ledger().expect("ledger");
         assert_eq!(ledger.leases.len(), 1);
         assert_eq!(ledger.leases[0].request_id, "req-1");
+    }
+
+    #[test]
+    fn execution_claim_moves_reserved_to_allocated_transactionally() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+
+        let execution = store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &["/bin/echo".into(), "cishape".into()],
+                1_000_100,
+            )
+            .expect("claim");
+
+        assert_eq!(execution.status, ExecutionStatus::Starting);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 9);
+        assert_eq!(worker.reserved_capacity, RunnerShape::new(0, 0));
+        assert_eq!(
+            worker.allocated_capacity,
+            RunnerShape::new(24_000, 48 * GIB)
+        );
+        assert_eq!(worker.reserved_allocations, 0);
+        assert_eq!(worker.running_allocations, 7);
+        assert_eq!(
+            store.ledger().expect("ledger").leases[0].status,
+            LeaseStatus::Claimed
+        );
+        assert_eq!(store.execution("exec-1").expect("execution"), execution);
+    }
+
+    #[test]
+    fn execution_claim_replay_is_idempotent_and_one_lease_has_one_execution() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+        let command = vec!["true".to_string()];
+
+        let first = store
+            .claim_execution("req-1", "exec-1", "test-backend", &command, 1_000_100)
+            .expect("first claim");
+        let replay = store
+            .claim_execution("req-1", "exec-1", "test-backend", &command, 1_000_200)
+            .expect("replay");
+
+        assert_eq!(replay, first);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 9);
+        assert_eq!(worker.running_allocations, 7);
+
+        let error = store
+            .claim_execution("req-1", "exec-2", "test-backend", &command, 1_000_300)
+            .unwrap_err();
+        assert!(error.to_string().contains("already belongs"));
+    }
+
+    #[test]
+    fn running_and_finish_execution_release_allocated_capacity() {
+        let mut store = seeded_store();
+        store
+            .reserve(&admission(), &request("req-1"), &policy(), 1_000_000)
+            .expect("reserve");
+        store
+            .claim_execution(
+                "req-1",
+                "exec-1",
+                "test-backend",
+                &["true".into()],
+                1_000_100,
+            )
+            .expect("claim");
+
+        let running = store
+            .mark_execution_running("exec-1", "backend-resource-1", 1_000_200)
+            .expect("running");
+        assert_eq!(running.status, ExecutionStatus::Running);
+
+        let finished = store
+            .finish_execution(
+                "exec-1",
+                &ExecutionCompletion {
+                    exit_code: Some(0),
+                    stdout: "ok\n".into(),
+                    stderr: String::new(),
+                    error: None,
+                    cleanup: crate::executor::CleanupStatus::Succeeded,
+                },
+                1_000_300,
+            )
+            .expect("finish");
+
+        assert_eq!(finished.status, ExecutionStatus::Succeeded);
+        let worker = store.worker("worker-a").expect("worker");
+        assert_eq!(worker.state_revision, 10);
+        assert_eq!(
+            worker.allocated_capacity,
+            RunnerShape::new(20_000, 40 * GIB)
+        );
+        assert_eq!(worker.running_allocations, 6);
     }
 
     #[test]

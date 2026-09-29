@@ -182,6 +182,23 @@ This DuckDB adapter is not a multi-instance control-plane database. It is suffic
 
 See `docs/reservation-store.md`.
 
+
+### Execution ownership and backend lifecycle
+
+EXECUTOR1 consumes an authoritative active reservation.
+
+Execution claim is a database transaction that converts reserved resources into running allocation, advances the worker revision, marks the reservation lease `claimed`, and inserts an `ExecutionRecord` in STARTING state.
+
+Backend creation then advances the execution to RUNNING without changing worker scheduling accounting. Terminal completion atomically returns allocated CPU/RAM and running allocation count while persisting SUCCEEDED/FAILED evidence.
+
+The first backend is a Boxd CLI adapter using isolated KVM machines. It preserves argv boundaries and attempts teardown after every command. The initial public proof accepts only the exact configured CPU2-MEM8 shape rather than silently translating arbitrary RunnerShapes.
+
+CI tests use a fake CLI binary and therefore prove orchestration/state accounting, not a KVM boot. The real microVM proof requires authenticated Boxd access.
+
+Crash reconciliation for orphaned STARTING/RUNNING executions remains a separate concern.
+
+See `docs/executor.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.
