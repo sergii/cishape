@@ -24,7 +24,7 @@ If you modify CIShape and make that modified version available for users to inte
 
 ## Current release
 
-**v0.1.1** is the current public CIShape release.
+**v0.1.2** is the current public CIShape release.
 
 - Linux binary package: `x86_64-unknown-linux-gnu`
 - standalone archive includes the default `policies/` and `catalogs/` runtime data
@@ -32,7 +32,7 @@ If you modify CIShape and make that modified version available for users to inte
 - release package includes SHA-256/provenance evidence and third-party license notices
 - source builds remain available for other platforms
 
-See [CIShape v0.1.1](https://github.com/sergii/cishape/releases/tag/v0.1.1).
+See [CIShape v0.1.2](https://github.com/sergii/cishape/releases/tag/v0.1.2).
 
 ## Quickstart
 
@@ -326,6 +326,3 @@ See:
 - [Decision outcomes](docs/outcomes.md)
 - [Future HTTP boundary](docs/contracts/http-boundary-v0.md)
 
-## License
-
-License is not selected yet. Do not treat the repository as licensed for redistribution until a license is added.
