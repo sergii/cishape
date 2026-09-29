@@ -186,7 +186,7 @@ pub struct ExecutorFit {
     pub preferences: Vec<BindingPreference>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindingReport {
     pub schema_version: u32,
     pub algorithm: String,
