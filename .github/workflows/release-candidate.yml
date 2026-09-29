@@ -97,6 +97,7 @@ jobs:
           cp target/release/cishape "dist/${PACKAGE}/cishape"
           cp README.md "dist/${PACKAGE}/README.md"
           cp docs/quickstart.md "dist/${PACKAGE}/QUICKSTART.md"
+          cp LICENSE "dist/${PACKAGE}/LICENSE"
           cp Cargo.lock "dist/${PACKAGE}/Cargo.lock"
 
           tar -C dist -czf "dist/${PACKAGE}.tar.gz" "${PACKAGE}"
@@ -152,7 +153,7 @@ jobs:
             echo
             echo "This workflow only builds and uploads an internal workflow artifact. It does not create a tag, GitHub Release, crates.io publish, or deployment."
             echo
-            echo "Public publishing remains blocked until the repository license boundary is explicitly decided."
+            echo "License: AGPL-3.0-only. This workflow still does not publish a tag or GitHub Release."
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload release candidate

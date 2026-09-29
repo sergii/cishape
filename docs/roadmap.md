@@ -275,7 +275,7 @@ Next: package the v0.1 onboarding/advisory experience. The personal-account capa
 
 ## V0.1 onboarding
 
-Status: ONBOARD1 in progress.
+Status: ONBOARD1 complete.
 
 Goal:
 
@@ -294,7 +294,7 @@ ONBOARD1:
 - show the path from observation through report/profile/recommend/explain/advisory
 - keep Jev shadow and provider capacity as optional advanced layers
 
-Next after ONBOARD1: release/package boundary, including the unresolved repository license decision.
+ONBOARD1 is complete. The first-run path is documented and local-first.
 
 ## V0.1 release candidate
 
@@ -316,7 +316,7 @@ RELEASE1:
 - generate SHA-256 checksum and provenance manifest
 - upload workflow artifact only
 - no tag, GitHub Release, crates.io publish, signing, or deployment
-- keep the unresolved license as an explicit public-publishing blocker
+- package the selected project license with the candidate
 
 RELEASE1 proof:
 
@@ -327,7 +327,23 @@ RELEASE1 proof:
 - workflow artifact uploaded as `cishape-v0.1.0-x86_64-unknown-linux-gnu-rc-36510349471-1`
 - artifact digest recorded by GitHub
 
-Next after RELEASE1: decide the repository license, then define RELEASE2 publication/platform scope.
+## V0.1 license
+
+Status: LICENSE1 complete.
+
+Decision:
+
+- license: GNU Affero General Public License v3.0 only
+- SPDX identifier: `AGPL-3.0-only`
+- Cargo package metadata declares the same identifier
+- release archives include the full license text
+- contributions are expected under the same project license unless explicitly agreed otherwise
+
+The public-distribution license blocker is removed.
+
+Next after LICENSE1: RELEASE2 - rebuild a licensed release candidate, verify its artifact contents/provenance, then create the `v0.1.0` tag and GitHub Release.
+
+
 
 ## VS9 - Cloud ingest
 
