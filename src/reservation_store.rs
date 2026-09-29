@@ -1,7 +1,8 @@
 use crate::admission::AdmissionReport;
 use crate::reservation::{
     ReservationLedger, ReservationLease, ReservationOutcome, ReservationPolicy,
-    ReservationRequest, ReservationTransition, expire_due, release, reserve,
+    ReservationRequest, ReservationTransition, expire_due as expire_transition,
+    release as release_transition, reserve as reserve_transition,
 };
 use crate::worker_state::{WorkerState, WorkerStateSnapshot};
 use anyhow::{Context, Result};
@@ -160,7 +161,8 @@ impl ReservationStore for DuckDbReservationStore {
         let worker = load_worker_from_tx(&tx, &request.worker_id)?
             .with_context(|| format!("worker {} not found", request.worker_id))?;
         let ledger = load_ledger_from_tx(&tx)?;
-        let transition = reserve(&worker, admission, &ledger, request, policy, now_unix_ms)?;
+        let transition =
+            reserve_transition(&worker, admission, &ledger, request, policy, now_unix_ms)?;
 
         if transition.outcome == ReservationOutcome::Reserved {
             persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
@@ -187,7 +189,7 @@ impl ReservationStore for DuckDbReservationStore {
             .with_context(|| format!("lease {lease_id} not found"))?;
         let worker = load_worker_from_tx(&tx, &lease.worker_id)?
             .with_context(|| format!("worker {} not found", lease.worker_id))?;
-        let transition = release(&worker, &ledger, lease_id, now_unix_ms)?;
+        let transition = release_transition(&worker, &ledger, lease_id, now_unix_ms)?;
 
         if transition.outcome == ReservationOutcome::Released {
             persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
@@ -215,7 +217,7 @@ impl ReservationStore for DuckDbReservationStore {
         let worker = load_worker_from_tx(&tx, worker_id)?
             .with_context(|| format!("worker {worker_id} not found"))?;
         let ledger = load_ledger_from_tx(&tx)?;
-        let transition = expire_due(&worker, &ledger, now_unix_ms)?;
+        let transition = expire_transition(&worker, &ledger, now_unix_ms)?;
 
         if transition.outcome == ReservationOutcome::Expired {
             persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
@@ -427,7 +429,7 @@ fn persist_terminal_lease(tx: &Transaction<'_>, lease: &ReservationLease) -> Res
 }
 
 fn lease_status_name(lease: &ReservationLease) -> &'static str {
-    match lease.status {
+    match &lease.status {
         crate::reservation::LeaseStatus::Active => "active",
         crate::reservation::LeaseStatus::Released => "released",
         crate::reservation::LeaseStatus::Expired => "expired",
