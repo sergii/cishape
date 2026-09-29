@@ -518,7 +518,38 @@ WORKERSTATE1:
 - derive free allocation capacity and structural `accepting_new_work`
 - remain read-only with no admission, reservation, scheduling, provisioning, or runner registration
 
-Next: ADMISSION1 - combine ExecutionPlan + BindingReport + WorkerStateSnapshot + versioned AdmissionPolicy to determine which compatible workers can safely accept a workload now.
+Next: ADMISSION1 - combine ExecutionPlan + BindingReport + WorkerStateSnapshot + versioned AdmissionPolicy to determine which compatible workers can accept a workload under explicit policy now.
+
+## VS10.8 - Worker admission
+
+Status: ADMISSION1 implemented.
+
+Goal:
+
+```text
+ExecutionPlan
+  + exact BindingReport
+  + WorkerStateSnapshot
+  + AdmissionPolicy
+  -> AdmissionReport
+```
+
+ADMISSION1:
+
+- bind capability evidence to the exact ExecutionPlan to reject stale artifacts
+- consider only workers attached to statically compatible executor IDs
+- evaluate ready/draining/offline lifecycle and allocation-count ceilings
+- evaluate target CPU/RAM against policy-selected capacity ceilings
+- default to physical CPU/RAM ceilings rather than silently consuming oversubscribed allocation limits
+- allow explicit allocation-limit basis only through versioned policy and require corresponding pressure thresholds
+- preserve configurable CPU/RAM reserves after hypothetical admission
+- fail closed when required CPU/memory/I/O pressure evidence is missing
+- distinguish `admit`, `defer`, and `no_eligible_worker`
+- return all admissible workers without ranking or selecting one
+- fail closed for exclusive CPU until core-level reservation evidence exists
+- keep the whole slice side-effect free
+
+Next: RESERVATION1 - define an atomic lease/reservation contract so two schedulers cannot consume the same snapshot capacity before any real executor is connected.
 
 ## VS11 - Controlled routing
 
