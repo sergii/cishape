@@ -1,7 +1,8 @@
 use crate::admission::AdmissionReport;
 use crate::executor::{
-    ExecutionCompletion, ExecutionRecord, ExecutionStatus, claim_execution as claim_execution_domain,
-    finish_execution as finish_execution_domain, mark_running as mark_execution_running_domain,
+    ExecutionCompletion, ExecutionRecord, ExecutionStatus,
+    claim_execution as claim_execution_domain, finish_execution as finish_execution_domain,
+    mark_running as mark_execution_running_domain,
 };
 use crate::reservation::{
     ReservationLease, ReservationLedger, ReservationOutcome, ReservationPolicy, ReservationRequest,
@@ -304,14 +305,8 @@ impl ReservationStore for DuckDbReservationStore {
         let worker = load_worker_from_tx(&tx, &lease.worker_id)?
             .with_context(|| format!("worker {} not found", lease.worker_id))?;
 
-        let transition = claim_execution_domain(
-            &worker,
-            lease,
-            execution_id,
-            backend,
-            command,
-            now_unix_ms,
-        )?;
+        let transition =
+            claim_execution_domain(&worker, lease, execution_id, backend, command, now_unix_ms)?;
 
         persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
         persist_terminal_lease(&tx, &transition.lease_after)?;
@@ -343,8 +338,7 @@ impl ReservationStore for DuckDbReservationStore {
             "execution {execution_id} is already terminal"
         );
 
-        let next =
-            mark_execution_running_domain(&execution, backend_resource_id, now_unix_ms)?;
+        let next = mark_execution_running_domain(&execution, backend_resource_id, now_unix_ms)?;
         persist_execution_status(&tx, &next, "starting")?;
         tx.commit()?;
         Ok(next)
@@ -365,11 +359,14 @@ impl ReservationStore for DuckDbReservationStore {
 
         let worker = load_worker_from_tx(&tx, &execution.worker_id)?
             .with_context(|| format!("worker {} not found", execution.worker_id))?;
-        let transition =
-            finish_execution_domain(&worker, &execution, completion, now_unix_ms)?;
+        let transition = finish_execution_domain(&worker, &execution, completion, now_unix_ms)?;
 
         persist_worker_cas(&tx, &transition.worker_after, worker.state_revision)?;
-        persist_execution_status(&tx, &transition.execution_after, execution_status_name(&execution))?;
+        persist_execution_status(
+            &tx,
+            &transition.execution_after,
+            execution_status_name(&execution),
+        )?;
         tx.commit()?;
         Ok(transition.execution_after)
     }
@@ -456,8 +453,15 @@ fn load_execution_by_lease_from_tx(
     else {
         return Ok(None);
     };
-    decode_execution_fields(&execution_id, &lease_id, &worker_id, &backend, &status, &json)
-        .map(Some)
+    decode_execution_fields(
+        &execution_id,
+        &lease_id,
+        &worker_id,
+        &backend,
+        &status,
+        &json,
+    )
+    .map(Some)
 }
 
 fn decode_execution_record(
@@ -469,9 +473,18 @@ fn decode_execution_record(
         "expected exactly one execution row for {execution_id}, found {}",
         records.len()
     );
-    let (lease_id, worker_id, backend, status, json) =
-        records.into_iter().next().context("execution row missing")?;
-    decode_execution_fields(execution_id, &lease_id, &worker_id, &backend, &status, &json)
+    let (lease_id, worker_id, backend, status, json) = records
+        .into_iter()
+        .next()
+        .context("execution row missing")?;
+    decode_execution_fields(
+        execution_id,
+        &lease_id,
+        &worker_id,
+        &backend,
+        &status,
+        &json,
+    )
 }
 
 fn decode_execution_fields(
@@ -489,12 +502,18 @@ fn decode_execution_fields(
         execution.execution_id == execution_id,
         "execution JSON execution_id mismatch"
     );
-    anyhow::ensure!(execution.lease_id == lease_id, "execution JSON lease_id mismatch");
+    anyhow::ensure!(
+        execution.lease_id == lease_id,
+        "execution JSON lease_id mismatch"
+    );
     anyhow::ensure!(
         execution.worker_id == worker_id,
         "execution JSON worker_id mismatch"
     );
-    anyhow::ensure!(execution.backend == backend, "execution JSON backend mismatch");
+    anyhow::ensure!(
+        execution.backend == backend,
+        "execution JSON backend mismatch"
+    );
     anyhow::ensure!(
         execution_status_name(&execution) == status,
         "execution JSON status mismatch"
@@ -1057,10 +1076,7 @@ mod tests {
             store.ledger().expect("ledger").leases[0].status,
             LeaseStatus::Claimed
         );
-        assert_eq!(
-            store.execution("exec-1").expect("execution"),
-            execution
-        );
+        assert_eq!(store.execution("exec-1").expect("execution"), execution);
     }
 
     #[test]
@@ -1072,22 +1088,10 @@ mod tests {
         let command = vec!["true".to_string()];
 
         let first = store
-            .claim_execution(
-                "req-1",
-                "exec-1",
-                "test-backend",
-                &command,
-                1_000_100,
-            )
+            .claim_execution("req-1", "exec-1", "test-backend", &command, 1_000_100)
             .expect("first claim");
         let replay = store
-            .claim_execution(
-                "req-1",
-                "exec-1",
-                "test-backend",
-                &command,
-                1_000_200,
-            )
+            .claim_execution("req-1", "exec-1", "test-backend", &command, 1_000_200)
             .expect("replay");
 
         assert_eq!(replay, first);
@@ -1096,13 +1100,7 @@ mod tests {
         assert_eq!(worker.running_allocations, 7);
 
         let error = store
-            .claim_execution(
-                "req-1",
-                "exec-2",
-                "test-backend",
-                &command,
-                1_000_300,
-            )
+            .claim_execution("req-1", "exec-2", "test-backend", &command, 1_000_300)
             .unwrap_err();
         assert!(error.to_string().contains("already belongs"));
     }
