@@ -1,8 +1,8 @@
 use crate::admission::AdmissionReport;
 use crate::reservation::{
-    ReservationLedger, ReservationLease, ReservationOutcome, ReservationPolicy,
-    ReservationRequest, ReservationTransition, expire_due as expire_transition,
-    release as release_transition, reserve as reserve_transition,
+    ReservationLease, ReservationLedger, ReservationOutcome, ReservationPolicy, ReservationRequest,
+    ReservationTransition, expire_due as expire_transition, release as release_transition,
+    reserve as reserve_transition,
 };
 use crate::worker_state::{WorkerState, WorkerStateSnapshot};
 use anyhow::{Context, Result};
@@ -21,11 +21,7 @@ pub trait ReservationStore {
         now_unix_ms: u64,
     ) -> Result<ReservationTransition>;
     fn release(&mut self, lease_id: &str, now_unix_ms: u64) -> Result<ReservationTransition>;
-    fn expire_due(
-        &mut self,
-        worker_id: &str,
-        now_unix_ms: u64,
-    ) -> Result<ReservationTransition>;
+    fn expire_due(&mut self, worker_id: &str, now_unix_ms: u64) -> Result<ReservationTransition>;
 }
 
 pub struct DuckDbReservationStore {
@@ -206,11 +202,7 @@ impl ReservationStore for DuckDbReservationStore {
         Ok(transition)
     }
 
-    fn expire_due(
-        &mut self,
-        worker_id: &str,
-        now_unix_ms: u64,
-    ) -> Result<ReservationTransition> {
+    fn expire_due(&mut self, worker_id: &str, now_unix_ms: u64) -> Result<ReservationTransition> {
         anyhow::ensure!(!worker_id.trim().is_empty(), "worker_id is required");
 
         let tx = self.connection.transaction()?;
@@ -319,7 +311,10 @@ fn decode_ledger_records(
             lease.request_id == request_id,
             "lease JSON request_id mismatch"
         );
-        anyhow::ensure!(lease.worker_id == worker_id, "lease JSON worker_id mismatch");
+        anyhow::ensure!(
+            lease.worker_id == worker_id,
+            "lease JSON worker_id mismatch"
+        );
         anyhow::ensure!(
             lease_status_name(&lease) == status,
             "lease JSON status mismatch"
@@ -449,7 +444,7 @@ mod tests {
     };
     use crate::model::{GIB, RunnerShape};
     use crate::reservation::{
-        RESERVATION_POLICY_SCHEMA_VERSION, RESERVATION_REQUEST_SCHEMA_VERSION, LeaseStatus,
+        LeaseStatus, RESERVATION_POLICY_SCHEMA_VERSION, RESERVATION_REQUEST_SCHEMA_VERSION,
     };
     use crate::worker_state::{WORKER_STATE_SNAPSHOT_SCHEMA_VERSION, WorkerLifecycle};
 
@@ -564,7 +559,10 @@ mod tests {
         assert_eq!(transition.outcome, ReservationOutcome::Reserved);
         let persisted = store.worker("worker-a").expect("worker");
         assert_eq!(persisted.state_revision, 8);
-        assert_eq!(persisted.reserved_capacity, RunnerShape::new(4_000, 8 * GIB));
+        assert_eq!(
+            persisted.reserved_capacity,
+            RunnerShape::new(4_000, 8 * GIB)
+        );
         let ledger = store.ledger().expect("ledger");
         assert_eq!(ledger.leases.len(), 1);
         assert_eq!(ledger.leases[0].status, LeaseStatus::Active);
