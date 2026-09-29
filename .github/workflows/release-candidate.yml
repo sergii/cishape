@@ -152,6 +152,43 @@ jobs:
           echo "checksum=dist/${PACKAGE}.tar.gz.sha256" >> "${GITHUB_OUTPUT}"
           echo "manifest=dist/${PACKAGE}.manifest.json" >> "${GITHUB_OUTPUT}"
 
+      - name: Acceptance test extracted release candidate
+        env:
+          PACKAGE: ${{ steps.meta.outputs.package }}
+        run: |
+          set -euo pipefail
+
+          (
+            cd dist
+            sha256sum -c "${PACKAGE}.tar.gz.sha256"
+          )
+
+          rm -rf acceptance
+          mkdir -p acceptance
+          tar -xzf "dist/${PACKAGE}.tar.gz" -C acceptance
+          cd "acceptance/${PACKAGE}"
+
+          for required in cishape README.md QUICKSTART.md LICENSE THIRD_PARTY_LICENSES.html Cargo.lock policies/default-v1.json policies/economics-default-v1.json catalogs/providers-v1.json; do
+            [ -f "${required}" ] || {
+              echo "Release candidate missing ${required}." >&2
+              exit 1
+            }
+          done
+
+          ./cishape --help >/dev/null
+          ./cishape catalog >/dev/null
+          ./cishape observe --job smoke -- sh -c 'sleep 0.02' >/dev/null
+          ./cishape report >/dev/null
+          ./cishape profile smoke >/dev/null
+
+          for _ in $(seq 1 10); do
+            ./cishape observe --job smoke -- sh -c 'sleep 0.02' >/dev/null
+          done
+
+          ./cishape recommend smoke >/dev/null
+          ./cishape explain smoke >/dev/null
+          ./cishape advisory --format markdown >/dev/null
+
       - name: Summarize release candidate
         env:
           PACKAGE: ${{ steps.meta.outputs.package }}
