@@ -139,8 +139,12 @@ impl ReservationLease {
             self.requested_worker_state_revision == self.worker_state_revision_before,
             "lease requested revision does not match revision before"
         );
+        let expected_after = self
+            .worker_state_revision_before
+            .checked_add(1)
+            .context("lease worker revision overflow")?;
         anyhow::ensure!(
-            self.worker_state_revision_after == self.worker_state_revision_before + 1,
+            self.worker_state_revision_after == expected_after,
             "lease reservation must advance worker revision exactly once"
         );
         match self.status {
@@ -148,10 +152,24 @@ impl ReservationLease {
                 self.terminal_at_unix_ms.is_none(),
                 "active lease must not have terminal timestamp"
             ),
-            LeaseStatus::Released | LeaseStatus::Expired => anyhow::ensure!(
-                self.terminal_at_unix_ms.is_some(),
-                "terminal lease must have terminal timestamp"
-            ),
+            LeaseStatus::Released => {
+                let terminal = self
+                    .terminal_at_unix_ms
+                    .context("released lease must have terminal timestamp")?;
+                anyhow::ensure!(
+                    terminal >= self.created_at_unix_ms,
+                    "released lease terminal timestamp cannot precede creation"
+                );
+            }
+            LeaseStatus::Expired => {
+                let terminal = self
+                    .terminal_at_unix_ms
+                    .context("expired lease must have terminal timestamp")?;
+                anyhow::ensure!(
+                    terminal >= self.expires_at_unix_ms,
+                    "expired lease terminal timestamp cannot precede expiry"
+                );
+            }
         }
         Ok(())
     }
