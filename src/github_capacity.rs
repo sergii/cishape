@@ -169,6 +169,110 @@ impl GitHubCapacityClient {
         self.collect_plan(token, &config.repository, &plan)
     }
 
+    pub fn collect_account(
+        &self,
+        token: &str,
+        config: &GitHubCapacityConfig,
+    ) -> Result<CapacitySnapshot> {
+        config.validate()?;
+        anyhow::ensure!(
+            config.provider == "github-actions",
+            "GitHub account capacity collection supports only provider github-actions"
+        );
+        anyhow::ensure!(!token.trim().is_empty(), "GitHub token is empty");
+        anyhow::ensure!(!self.api_base.is_empty(), "GitHub API base is empty");
+
+        let user = self.authenticated_user(token)?;
+        let (target_owner, _) = config
+            .repository
+            .split_once('/')
+            .expect("repository validated as owner/name");
+        anyhow::ensure!(
+            target_owner.eq_ignore_ascii_case(&user.login),
+            "target repository owner {target_owner} does not match authenticated GitHub user {}",
+            user.login
+        );
+
+        let owned_private_repos = user.owned_private_repos.context(
+            "GitHub token did not expose owned_private_repos; cannot prove complete personal-account repository inventory",
+        )?;
+        let expected_repository_count = user
+            .public_repos
+            .checked_add(owned_private_repos)
+            .context("owned repository count overflow")?;
+
+        let repositories = self.owned_repositories(token)?;
+        anyhow::ensure!(
+            repositories.len() as u64 == expected_repository_count,
+            "owned repository inventory is incomplete: GitHub user metadata reports {expected_repository_count}, but repository enumeration returned {}",
+            repositories.len()
+        );
+        anyhow::ensure!(
+            repositories
+                .iter()
+                .all(|repository| repository.owner.login.eq_ignore_ascii_case(&user.login)),
+            "owned repository enumeration returned a repository outside authenticated user {}",
+            user.login
+        );
+
+        let target = repositories
+            .iter()
+            .find(|repository| repository.full_name.eq_ignore_ascii_case(&config.repository))
+            .with_context(|| {
+                format!(
+                    "target repository {} is missing from complete owned repository inventory",
+                    config.repository
+                )
+            })?;
+        let repository_visibility = if target.is_private {
+            RepositoryVisibility::Private
+        } else {
+            RepositoryVisibility::Public
+        };
+
+        let plan = GitHubCapacityPlan {
+            schema_version: GITHUB_CAPACITY_PLAN_SCHEMA_VERSION,
+            pools: vec![config.pool()],
+        };
+        let mut jobs = Vec::new();
+        for repository in &repositories {
+            let run_ids = self.active_run_ids(token, &repository.full_name)?;
+            for run_id in run_ids {
+                jobs.extend(self.jobs_for_run(token, &repository.full_name, run_id)?);
+            }
+        }
+
+        let counts = count_active_jobs(&jobs, &plan)?;
+        let (queue_depth, running_jobs) = counts
+            .into_iter()
+            .next()
+            .expect("single-pool plan emits one count");
+        let scope_key = format!("github:user:{}", user.login);
+        let state = CapacityState {
+            provider: config.provider.clone(),
+            offer_id: config.offer_id.clone(),
+            capacity_scope: Some(CapacityScope::provider_account(scope_key.clone())),
+            queue_depth,
+            running_jobs,
+            parallel_slots: config.parallel_slots,
+            slot_turnover_ms: config.slot_turnover_ms,
+            cache_state: config.cache_state.clone(),
+            cache_penalty_ms: config.cache_penalty_ms,
+            utilization: None,
+        };
+        let snapshot = CapacitySnapshot {
+            schema_version: 1,
+            observed_at: observed_at_now()?,
+            source: format!(
+                "github-actions-account-rest-v{GITHUB_API_VERSION}:{scope_key}"
+            ),
+            repository_visibility: Some(repository_visibility),
+            states: vec![state],
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
     pub fn collect_plan(
         &self,
         token: &str,
@@ -216,6 +320,44 @@ impl GitHubCapacityClient {
         };
         snapshot.validate()?;
         Ok(snapshot)
+    }
+
+    fn authenticated_user(&self, token: &str) -> Result<AuthenticatedUserMetadata> {
+        let url = format!("{}/user", self.api_base);
+        self.get_json(token, &url)
+    }
+
+    fn owned_repositories(&self, token: &str) -> Result<Vec<OwnedRepositorySummary>> {
+        let mut repositories = Vec::new();
+        let mut page = 1_u32;
+
+        loop {
+            let url = format!(
+                "{}/user/repos?affiliation=owner&visibility=all&per_page=100&page={page}",
+                self.api_base
+            );
+            let mut response: Vec<OwnedRepositorySummary> = self.get_json(token, &url)?;
+            let page_count = response.len();
+            repositories.append(&mut response);
+
+            if page_count < 100 {
+                break;
+            }
+            page = page
+                .checked_add(1)
+                .ok_or_else(|| anyhow::anyhow!("owned repository page overflow"))?;
+        }
+
+        let mut identities = BTreeSet::new();
+        for repository in &repositories {
+            anyhow::ensure!(
+                identities.insert(repository.full_name.to_ascii_lowercase()),
+                "duplicate owned repository {}",
+                repository.full_name
+            );
+        }
+
+        Ok(repositories)
     }
 
     fn repository_visibility(&self, token: &str, repository: &str) -> Result<RepositoryVisibility> {
@@ -367,6 +509,26 @@ fn count_active_jobs(
     }
 
     Ok(counts)
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthenticatedUserMetadata {
+    login: String,
+    public_repos: u64,
+    owned_private_repos: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OwnedRepositoryOwner {
+    login: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OwnedRepositorySummary {
+    full_name: String,
+    owner: OwnedRepositoryOwner,
+    #[serde(rename = "private")]
+    is_private: bool,
 }
 
 #[derive(Debug, Deserialize)]
