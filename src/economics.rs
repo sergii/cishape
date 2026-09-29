@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::{
     ExecutionModel, OfferPricing, ProviderCatalog, RepositoryVisibility, RunnerOffer,
 };
@@ -78,6 +79,8 @@ impl std::fmt::Display for CacheState {
 pub struct CapacityState {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub queue_depth: u32,
     pub running_jobs: u32,
     pub parallel_slots: u32,
@@ -92,6 +95,9 @@ impl CapacityState {
     fn validate(&self) -> Result<()> {
         anyhow::ensure!(!self.provider.trim().is_empty(), "provider is required");
         anyhow::ensure!(!self.offer_id.trim().is_empty(), "offer_id is required");
+        if let Some(scope) = &self.capacity_scope {
+            scope.validate()?;
+        }
         anyhow::ensure!(self.parallel_slots > 0, "parallel_slots must be positive");
         anyhow::ensure!(
             self.running_jobs <= self.parallel_slots,
@@ -137,6 +143,8 @@ impl std::fmt::Display for CostBasis {
 pub struct EconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub execution_model: ExecutionModel,
     pub offer_shape: RunnerShape,
     pub cache_state: CacheState,
