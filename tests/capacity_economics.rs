@@ -60,7 +60,6 @@ fn deterministic_fixture_compares_managed_and_persistent_capacity() {
     assert!(hetzner.pareto_optimal);
 }
 
-
 #[test]
 fn contextual_offer_requires_matching_snapshot_visibility() {
     let catalog =
@@ -98,13 +97,12 @@ fn contextual_offer_requires_matching_snapshot_visibility() {
         11_000,
     )
     .expect("mismatched economics");
-    assert!(
-        mismatched
-            .skipped
-            .iter()
-            .any(|item| item.offer_id == "ubuntu-latest-public-x64"
-                && item.reason.contains("requires public repository visibility"))
-    );
+    assert!(mismatched.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-public-x64"
+            && item
+                .reason
+                .contains("requires public repository visibility")
+    }));
 
     snapshot.repository_visibility = None;
     let unknown = evaluate(
