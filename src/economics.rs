@@ -427,7 +427,9 @@ pub fn to_markdown(report: &EconomicsReport) -> String {
     ));
 
     output.push_str("| Provider | Offer | Scope | Cache | Queue | Running/slots | Runtime | Queue wait | Time-to-green | Effective cost | Cost basis | Pareto |\n");
-    output.push_str("| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
+    output.push_str(
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |\n",
+    );
 
     for evaluation in &report.evaluations {
         let scope = evaluation
