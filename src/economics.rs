@@ -278,6 +278,23 @@ pub(crate) fn evaluate_offer(
         }
     }
 
+    if let Some(required_scope) = &offer.required_capacity_scope {
+        match &state.capacity_scope {
+            Some(actual_scope) if &actual_scope.kind == required_scope => {}
+            Some(actual_scope) => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state is {} ({})",
+                    actual_scope.kind, actual_scope.key
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "offer requires {required_scope} capacity scope but snapshot state scope is unknown"
+                ));
+            }
+        }
+    }
+
     let shape = offer
         .capacity
         .complete_shape()
@@ -341,6 +358,7 @@ pub(crate) fn evaluate_offer(
     Ok(EconomicsEvaluation {
         provider: offer.provider.clone(),
         offer_id: offer.offer_id.clone(),
+        capacity_scope: state.capacity_scope.clone(),
         execution_model: offer.execution_model.clone(),
         offer_shape: shape,
         cache_state: state.cache_state.clone(),
@@ -456,6 +474,7 @@ mod tests {
         CapacityState {
             provider: "test".into(),
             offer_id: "test".into(),
+            capacity_scope: None,
             queue_depth,
             running_jobs,
             parallel_slots,
@@ -479,6 +498,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: None,
