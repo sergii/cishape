@@ -150,6 +150,8 @@ Provider records carry pricing provenance and billing semantics. Missing RAM, pr
 
 CATALOG2 makes repository context explicit where a provider reuses one runner label for different products. For GitHub standard `ubuntu-latest`, public and private repositories are separate offers. Use `catalog-fit --repository-visibility public|private` when evaluating those contextual offers; omitting visibility excludes them instead of guessing.
 
+CATALOG3 carries the same context through live capacity evidence. The GitHub adapter records the repository's actual public/private visibility in `CapacitySnapshot`, and economics rejects a contextual offer when the live context is missing or does not match. Runner labels and offer IDs are never used to guess visibility.
+
 ## Capacity economics
 
 CAPACITY1 combines static provider offers with a time-scoped runtime capacity snapshot:
