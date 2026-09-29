@@ -196,6 +196,9 @@ fn mark_pareto_frontier(evaluations: &mut [BatchEconomicsEvaluation]) {
 pub fn to_markdown(report: &BatchEconomicsReport) -> String {
     let mut output = String::new();
     output.push_str("## Parallel-job batch\n\n");
+    if let Some(visibility) = &report.snapshot_repository_visibility {
+        output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
+    }
     output.push_str(&format!("- Jobs: {}\n\n", report.parallel_jobs));
     output.push_str("| Provider | Offer | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
     output.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
