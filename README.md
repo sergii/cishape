@@ -225,6 +225,9 @@ CAPACITY8 wires this chain into the existing `CI Advisory` GitHub Actions workfl
 
 When enabled, the workflow collects live queue/running state, writes `capacity.json`, generates Markdown plus full JSON economics evidence, appends the Markdown to the GitHub job summary, and uploads all advisory evidence together. Execution remains read-only.
 
+
+CAPACITY9 makes concurrency evidence scope explicit. The current GitHub live adapter scans one repository, so its states are tagged `repository:<owner/repo>`. Standard GitHub-hosted runner offers require `provider_account` scope; repository-only queue counts are therefore rejected for those offers instead of being combined with account-wide concurrency limits. A future account/org-wide observer must supply scope-complete evidence for that live comparison.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
