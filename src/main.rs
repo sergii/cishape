@@ -910,7 +910,10 @@ fn capacity_github_account_command(
         ensure_parent(path)?;
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
-        let state = snapshot.states.first().expect("account adapter emits one state");
+        let state = snapshot
+            .states
+            .first()
+            .expect("account adapter emits one state");
         let scope = state
             .capacity_scope
             .as_ref()
