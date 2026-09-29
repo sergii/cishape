@@ -1338,7 +1338,11 @@ fn execution_plan_command(
     Ok(())
 }
 
-fn execution_fit_command(plan_path: &Path, catalog_path: &Path, output: Option<&Path>) -> Result<()> {
+fn execution_fit_command(
+    plan_path: &Path,
+    catalog_path: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
     let plan = cishape::execution::ExecutionPlan::load(plan_path)?;
     let catalog = ExecutorCatalog::load(catalog_path)?;
     let report = fit_execution(&plan, &catalog)?;
