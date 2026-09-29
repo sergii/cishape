@@ -146,8 +146,8 @@ pub struct AdmissionReport {
 
 impl AdmissionReport {
     pub fn load(path: &Path) -> Result<Self> {
-        let bytes =
-            std::fs::read(path).with_context(|| format!("read admission report {}", path.display()))?;
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read admission report {}", path.display()))?;
         let report: Self = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse admission report {}", path.display()))?;
         report.validate()?;
@@ -160,8 +160,14 @@ impl AdmissionReport {
             "unsupported admission report schema version {}",
             self.schema_version
         );
-        anyhow::ensure!(!self.algorithm.trim().is_empty(), "admission algorithm is required");
-        anyhow::ensure!(!self.policy_id.trim().is_empty(), "admission policy_id is required");
+        anyhow::ensure!(
+            !self.algorithm.trim().is_empty(),
+            "admission algorithm is required"
+        );
+        anyhow::ensure!(
+            !self.policy_id.trim().is_empty(),
+            "admission policy_id is required"
+        );
         self.plan.validate()?;
         anyhow::ensure!(
             self.job == self.plan.job,
@@ -212,13 +218,12 @@ impl AdmissionReport {
 
         let expected_outcome = if !declared.is_empty() {
             AdmissionOutcome::Admit
-        } else if self
-            .workers
-            .iter()
-            .any(|worker| worker.exclusions.iter().all(|reason| {
-                reason.code != AdmissionExclusionCode::ExecutorNotCompatible
-            }))
-        {
+        } else if self.workers.iter().any(|worker| {
+            worker
+                .exclusions
+                .iter()
+                .all(|reason| reason.code != AdmissionExclusionCode::ExecutorNotCompatible)
+        }) {
             AdmissionOutcome::Defer
         } else {
             AdmissionOutcome::NoEligibleWorker
