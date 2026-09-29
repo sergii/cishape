@@ -92,9 +92,39 @@ The REST reads are not an atomic provider snapshot. Queue state can move while p
 
 Repository visibility is evidence, not an inference from a runner label or offer ID. Downstream economics compares it with any contextual ProviderCatalog offer and fails closed on missing or mismatched context.
 
+## Personal-account scope
+
+CAPACITY10 adds a separate personal-account collector for standard GitHub-hosted capacity evidence:
+
+```bash
+export CISHAPE_GITHUB_ACCOUNT_TOKEN=...
+
+cargo run -- capacity-github-account \
+  --repository owner/repo \
+  --offer-id ubuntu-latest-private-x64 \
+  --runner-label ubuntu-latest \
+  --parallel-slots 20 \
+  --slot-turnover-ms 12000 \
+  --cache-state warm \
+  --cache-penalty-ms 0 \
+  --output .cishape/capacity/github-account.json
+```
+
+The collector authenticates the user, enumerates every repository owned by that personal account, and scans active Actions jobs across all of them. It emits a state scoped as:
+
+```text
+provider_account:github:user:<login>
+```
+
+This scope is emitted only after completeness is proven. The token must expose `owned_private_repos`, and the number of repositories returned by `/user/repos?affiliation=owner&visibility=all` must exactly equal `public_repos + owned_private_repos`. Any missing repository, unreadable Actions endpoint, or owner mismatch fails the whole collection instead of producing a partial snapshot.
+
+The target repository still matters because its public/private visibility selects the correct contextual runner offer. The first account collector is intentionally restricted to `github-actions` provider identity; it does not claim that GitHub account ownership proves Depot, Blacksmith, or self-hosted provider capacity scope.
+
+`parallel_slots` remains explicit evidence. GitHub publishes plan defaults, but account concurrency can be changed, so CIShape does not derive an authoritative capacity limit from a plan name.
+
 ## Scope boundary
 
-The current GitHub adapter is deliberately repository-scoped. It does **not** pretend that one repository's queued/running jobs represent an account-wide or organization-wide concurrency pool.
+The repository-scoped GitHub adapter remains useful for pools whose concurrency domain really is repository-local. It does **not** pretend that one repository's queued/running jobs represent an account-wide or organization-wide concurrency pool.
 
 That matters for standard GitHub-hosted runners: their provider catalog offers require `provider_account` capacity evidence. Therefore a snapshot produced by the current repository scanner will be rejected for those offers even when the repository visibility matches.
 

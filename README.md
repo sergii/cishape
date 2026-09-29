@@ -228,6 +228,9 @@ When enabled, the workflow collects live queue/running state, writes `capacity.j
 
 CAPACITY9 makes concurrency evidence scope explicit. The current GitHub live adapter scans one repository, so its states are tagged `repository:<owner/repo>`. Standard GitHub-hosted runner offers require `provider_account` scope; repository-only queue counts are therefore rejected for those offers instead of being combined with account-wide concurrency limits. A future account/org-wide observer must supply scope-complete evidence for that live comparison.
 
+
+CAPACITY10 provides that scope-complete path for personal GitHub accounts. `capacity-github-account` proves it can enumerate the authenticated user's complete owned-repository inventory, aggregates active GitHub-hosted jobs across every owned repository, and emits `provider_account:github:user:<login>` evidence. It fails closed on partial repository visibility and still requires the actual concurrency limit as an explicit input.
+
 ## Outcomes
 
 A deterministic DecisionRecord can later be compared with matching post-decision observations:
