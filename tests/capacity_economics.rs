@@ -93,7 +93,9 @@ fn account_scoped_offer_rejects_repository_scoped_concurrency_evidence() {
     );
     assert!(report.skipped.iter().any(|item| {
         item.offer_id == "ubuntu-latest-private-x64"
-            && item.reason.contains("requires provider_account capacity scope")
+            && item
+                .reason
+                .contains("requires provider_account capacity scope")
             && item.reason.contains("repository")
     }));
 
