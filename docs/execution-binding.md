@@ -129,11 +129,14 @@ Representative shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "algorithm": "executor-fit-v1",
   "catalog_id": "executors-v1-example",
   "job": "test",
   "repository": "acme/api",
+  "plan": {
+    "...": "exact ExecutionPlan evidence embedded here"
+  },
   "compatible_executor_ids": [
     "boxd-like-microvm-x86_64",
     "byoc-dedicated-x86_64",
@@ -144,6 +147,8 @@ Representative shape:
 ```
 
 The checked-in catalog is illustrative. Names containing `boxd-like` or `firecracker-like` describe capability examples only. CIShape does not call those systems in BINDING1.
+
+BindingReport schema v2 embeds the exact ExecutionPlan used for capability matching. Downstream admission must reject a binding artifact whose embedded plan differs from the supplied plan, preventing stale binding evidence from being reused after CPU/RAM/isolation requirements change.
 
 ## Why there is no selected executor
 
