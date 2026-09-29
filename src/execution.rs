@@ -152,8 +152,8 @@ pub struct ExecutionPlan {
 
 impl ExecutionPlan {
     pub fn load(path: &Path) -> Result<Self> {
-        let bytes =
-            std::fs::read(path).with_context(|| format!("read execution plan {}", path.display()))?;
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read execution plan {}", path.display()))?;
         let plan: Self = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse execution plan {}", path.display()))?;
         plan.validate()?;
@@ -166,7 +166,10 @@ impl ExecutionPlan {
             "unsupported execution plan schema version {}",
             self.schema_version
         );
-        anyhow::ensure!(!self.planner_version.trim().is_empty(), "planner_version is required");
+        anyhow::ensure!(
+            !self.planner_version.trim().is_empty(),
+            "planner_version is required"
+        );
         anyhow::ensure!(
             !self.requirements_id.trim().is_empty(),
             "requirements_id is required"
