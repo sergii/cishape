@@ -53,6 +53,8 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - Execution environment and resource tenancy are independent dimensions. Do not collapse process/container/microVM isolation and shared/dedicated allocation into one class label.
 - Execution planning must not infer trust, isolation, cache, concurrency, or placement requirements from job names or provider labels. Missing evidence stays explicit.
 - An ExecutionPlan is advisory evidence only. Provisioning, runner registration, scheduling, and workflow mutation remain control-plane responsibilities.
+- Executor catalogs describe static/configuration-level capabilities only. Keep live worker availability, queue depth, free resources, cache warmth, and liveness in separate runtime evidence.
+- Capability compatibility is not executor selection. If several executors fit, preserve the compatible set unless an explicit versioned selection/scheduling policy with the required evidence is present.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence
