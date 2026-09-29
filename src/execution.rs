@@ -167,9 +167,7 @@ pub fn plan(
     );
 
     let environment = match (&requirements.code_trust, &requirements.minimum_isolation) {
-        (CodeTrust::Untrusted, _) | (_, MinimumIsolation::Kernel) => {
-            ExecutionEnvironment::Microvm
-        }
+        (CodeTrust::Untrusted, _) | (_, MinimumIsolation::Kernel) => ExecutionEnvironment::Microvm,
         (_, MinimumIsolation::Container) => ExecutionEnvironment::Container,
         (_, MinimumIsolation::Process) => ExecutionEnvironment::Process,
     };
