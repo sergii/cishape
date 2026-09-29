@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CIShape Third-Party Licenses</title>
+  <style>
+    body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; border: 1px solid #ddd; }
+    h2 { margin-top: 2.5rem; }
+  </style>
+</head>
+<body>
+  <h1>CIShape Third-Party Licenses</h1>
+  <p>This document is generated from the dependency graph used to build CIShape.</p>
+
+  <h2>License overview</h2>
+  <ul>
+  {{#each overview}}
+    <li>{{name}} - {{count}} dependency package(s)</li>
+  {{/each}}
+  </ul>
+
+  <h2>License texts and packages</h2>
+  {{#each licenses}}
+    {{#if first_of_kind}}<h3>{{name}}</h3>{{/if}}
+    <h4>{{name}}</h4>
+    <p>Used by:</p>
+    <ul>
+    {{#each used_by}}
+      <li>{{crate.name}} {{crate.version}}</li>
+    {{/each}}
+    </ul>
+    <pre>{{text}}</pre>
+  {{/each}}
+</body>
+</html>
