@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub const EXECUTOR_CATALOG_SCHEMA_VERSION: u32 = 1;
-pub const BINDING_REPORT_SCHEMA_VERSION: u32 = 1;
+pub const BINDING_REPORT_SCHEMA_VERSION: u32 = 2;
 pub const BINDING_ALGORITHM_VERSION: &str = "executor-fit-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,6 +193,7 @@ pub struct BindingReport {
     pub catalog_id: String,
     pub job: String,
     pub repository: Option<String>,
+    pub plan: ExecutionPlan,
     pub compatible_executor_ids: Vec<String>,
     pub fits: Vec<ExecutorFit>,
 }
@@ -216,6 +217,15 @@ impl BindingReport {
         anyhow::ensure!(!self.algorithm.trim().is_empty(), "binding algorithm is required");
         anyhow::ensure!(!self.catalog_id.trim().is_empty(), "catalog_id is required");
         anyhow::ensure!(!self.job.trim().is_empty(), "binding job is required");
+        self.plan.validate()?;
+        anyhow::ensure!(
+            self.job == self.plan.job,
+            "binding job does not match embedded ExecutionPlan"
+        );
+        anyhow::ensure!(
+            self.repository == self.plan.repository,
+            "binding repository does not match embedded ExecutionPlan"
+        );
 
         let mut fit_ids = BTreeSet::new();
         let mut compatible_ids = Vec::new();
@@ -277,6 +287,7 @@ pub fn fit(plan: &ExecutionPlan, catalog: &ExecutorCatalog) -> Result<BindingRep
         catalog_id: catalog.catalog_id.clone(),
         job: plan.job.clone(),
         repository: plan.repository.clone(),
+        plan: plan.clone(),
         compatible_executor_ids,
         fits,
     };
