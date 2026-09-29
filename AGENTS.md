@@ -15,6 +15,8 @@ Keep these responsibilities separate:
 
 CIShape is not a CI control plane and must not become one by accident.
 
+CIShape may emit provider-neutral advisory execution plans for another control plane to consume, but planning must remain side-effect free.
+
 ## Core invariants
 
 - Canonical runner capacity is numeric. Provider labels such as small, large, or xlarge are aliases only.
@@ -48,6 +50,9 @@ CIShape is not a CI control plane and must not become one by accident.
 - Workflow-level economics evaluates one provider offer as a whole-workflow scenario unless a future versioned placement model explicitly says otherwise; do not silently turn advisory evaluation into cross-provider routing.
 - Outcome evaluation is observational. Never claim a runner caused a failure or latency change from temporal correlation alone.
 - OpenTelemetry CI/CD semantics should be reused where they fit instead of inventing equivalent vocabulary.
+- Execution environment and resource tenancy are independent dimensions. Do not collapse process/container/microVM isolation and shared/dedicated allocation into one class label.
+- Execution planning must not infer trust, isolation, cache, concurrency, or placement requirements from job names or provider labels. Missing evidence stays explicit.
+- An ExecutionPlan is advisory evidence only. Provisioning, runner registration, scheduling, and workflow mutation remain control-plane responsibilities.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence
