@@ -76,7 +76,7 @@ Priorities:
 
 ## VS4 - Decision providers
 
-Status: Deterministic provider is the primary path. Jev shadow/live adapters are implemented but deferred and non-blocking.
+Status: Deterministic provider is the primary path. Jev shadow/live adapters are implemented, and LIVE1 credentialed shadow proof is complete.
 
 Keep deterministic feasibility/ranking.
 
@@ -90,7 +90,7 @@ JEV1:
 
 JEV2 adds the explicit live TypeSafe HTTP transport while preserving raw response evidence and the same fail-closed validator.
 
-LIVE1 adds a manual GitHub Actions Jev proof that consumes rolling history. Running it is optional and can happen later.
+LIVE1 is complete: the manual GitHub Actions proof consumed 24 real rolling-history runs for `test`, called Jev System One, validated the response, and recorded agreement with the deterministic `cpu8-mem16` baseline at 0.88 confidence. The proof remained shadow-only.
 
 ## VS5 - Deterministic advisory
 
@@ -269,7 +269,9 @@ CAPACITY10:
 - fail closed on partial inventory or unreadable repository Actions state
 - leave organization/enterprise scope for a separate completeness model
 
-Next: run the first real personal-account dogfood proof with explicit account concurrency evidence, then package the v0.1 onboarding/advisory experience.
+CAPACITY11 follow-up is deferred research: determine a least-privilege GitHub authentication model that can prove complete private owned-repository inventory without weakening CAPACITY10 fail-closed semantics. See `docs/research/github-account-capacity-auth.md` and issue #55.
+
+Next: package the v0.1 onboarding/advisory experience. The personal-account capacity proof is no longer a v0.1 blocker.
 
 ## VS9 - Cloud ingest
 
