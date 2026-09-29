@@ -12,7 +12,7 @@ It:
 - requires the dispatch ref to be `main`
 - resolves a fresh dependency lock once for the run, records its SHA-256, then builds `cishape` with `cargo build --release --locked`
 - smoke-tests `cishape --help` and `cishape demo`
-- packages the binary with README and the v0.1 quickstart
+- packages the binary with README, the v0.1 quickstart, the exact dependency lock, and the AGPL license
 - emits a SHA-256 checksum
 - emits a machine-readable provenance manifest
 - uploads the files as a GitHub Actions artifact
@@ -41,6 +41,7 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu/
   cishape
   README.md
   QUICKSTART.md
+  LICENSE
   Cargo.lock
 ```
 
@@ -78,9 +79,9 @@ The Linux binary itself should be executed on a compatible Linux x86_64 system.
 
 ## License boundary
 
-The repository does not yet declare a redistribution license.
+CIShape is licensed under `AGPL-3.0-only`, and release-candidate archives include the full `LICENSE` text.
 
-Therefore RELEASE1 is a **build/provenance proof**, not a public distribution release. The workflow artifact is useful for validating packaging and reproducibility, but the project should not create a public GitHub Release or publish to a package registry until the license decision is explicit.
+RELEASE1 remains a **build/provenance proof** because the workflow itself intentionally does not publish a Git tag or GitHub Release. The licensing blocker has been removed; RELEASE2 can now define the public publication path.
 
 ## Proven release candidate
 
