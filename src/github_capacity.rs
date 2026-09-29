@@ -218,7 +218,11 @@ impl GitHubCapacityClient {
 
         let target = repositories
             .iter()
-            .find(|repository| repository.full_name.eq_ignore_ascii_case(&config.repository))
+            .find(|repository| {
+                repository
+                    .full_name
+                    .eq_ignore_ascii_case(&config.repository)
+            })
             .with_context(|| {
                 format!(
                     "target repository {} is missing from complete owned repository inventory",
@@ -264,9 +268,7 @@ impl GitHubCapacityClient {
         let snapshot = CapacitySnapshot {
             schema_version: 1,
             observed_at,
-            source: format!(
-                "github-actions-account-rest-v{GITHUB_API_VERSION}:{scope_key}"
-            ),
+            source: format!("github-actions-account-rest-v{GITHUB_API_VERSION}:{scope_key}"),
             repository_visibility: Some(repository_visibility),
             states: vec![state],
         };
@@ -846,9 +848,10 @@ mod tests {
             .expect("captures");
         assert_eq!(requests.len(), 8);
         assert!(requests[0].contains("GET /user "));
-        assert!(requests[1].contains(
-            "GET /user/repos?affiliation=owner&visibility=all&per_page=100&page=1 "
-        ));
+        assert!(
+            requests[1]
+                .contains("GET /user/repos?affiliation=owner&visibility=all&per_page=100&page=1 ")
+        );
         assert!(requests.iter().any(|request| {
             request.contains("GET /repos/owner/repo/actions/runs?status=queued")
         }));
@@ -880,7 +883,11 @@ mod tests {
             .collect_account("secret-token", &config())
             .expect_err("owner mismatch must fail");
 
-        assert!(error.to_string().contains("does not match authenticated GitHub user"));
+        assert!(
+            error
+                .to_string()
+                .contains("does not match authenticated GitHub user")
+        );
     }
 
     #[test]
