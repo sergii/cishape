@@ -1373,7 +1373,7 @@ fn execution_fit_command(
 
 fn worker_state_command(snapshot_path: &Path, output: Option<&Path>) -> Result<()> {
     let snapshot = WorkerStateSnapshot::load(snapshot_path)?;
-    let report = snapshot.report();
+    let report = snapshot.report()?;
     let payload = serde_json::to_string_pretty(&report).context("serialize WorkerStateReport")?;
 
     if let Some(path) = output {
