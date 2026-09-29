@@ -1,3 +1,4 @@
+use crate::catalog::RepositoryVisibility;
 use crate::economics::{CacheState, CapacitySnapshot, CapacityState};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -179,6 +180,7 @@ impl GitHubCapacityClient {
         plan.validate()?;
 
         let observed_at = observed_at_now()?;
+        let repository_visibility = self.repository_visibility(token, repository)?;
         let run_ids = self.active_run_ids(token, repository)?;
         let mut jobs = Vec::new();
         for run_id in run_ids {
@@ -207,10 +209,25 @@ impl GitHubCapacityClient {
             schema_version: 1,
             observed_at,
             source: format!("github-actions-rest-v{GITHUB_API_VERSION}:{repository}"),
+            repository_visibility: Some(repository_visibility),
             states,
         };
         snapshot.validate()?;
         Ok(snapshot)
+    }
+
+    fn repository_visibility(
+        &self,
+        token: &str,
+        repository: &str,
+    ) -> Result<RepositoryVisibility> {
+        let url = format!("{}/repos/{repository}", self.api_base);
+        let metadata: RepositoryMetadata = self.get_json(token, &url)?;
+        Ok(if metadata.is_private {
+            RepositoryVisibility::Private
+        } else {
+            RepositoryVisibility::Public
+        })
     }
 
     fn active_run_ids(&self, token: &str, repository: &str) -> Result<BTreeSet<u64>> {
@@ -352,6 +369,12 @@ fn count_active_jobs(
     }
 
     Ok(counts)
+}
+
+#[derive(Debug, Deserialize)]
+struct RepositoryMetadata {
+    #[serde(rename = "private")]
+    is_private: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -503,6 +526,7 @@ mod tests {
     #[test]
     fn collects_matching_jobs_with_pagination_and_auth() {
         let responses = vec![
+            r#"{"private":true}"#,
             r#"{"total_count":2,"workflow_runs":[{"id":10}]}"#,
             r#"{"total_count":2,"workflow_runs":[{"id":12}]}"#,
             r#"{"total_count":1,"workflow_runs":[{"id":11}]}"#,
@@ -520,13 +544,18 @@ mod tests {
         assert_eq!(state.running_jobs, 1);
         assert_eq!(state.parallel_slots, 4);
         assert_eq!(state.slot_turnover_ms, 12_000);
+        assert_eq!(
+            snapshot.repository_visibility,
+            Some(RepositoryVisibility::Private)
+        );
         assert!(snapshot.source.contains("owner/repo"));
 
         let requests = captured
             .recv_timeout(Duration::from_secs(2))
             .expect("captures");
-        assert_eq!(requests.len(), 6);
-        assert!(requests[1].contains("status=queued&per_page=100&page=2"));
+        assert_eq!(requests.len(), 7);
+        assert!(requests[0].contains("GET /repos/owner/repo "));
+        assert!(requests[2].contains("status=queued&per_page=100&page=2"));
         assert!(requests.iter().all(|request| {
             request
                 .to_ascii_lowercase()
@@ -542,6 +571,7 @@ mod tests {
     #[test]
     fn one_scan_populates_multiple_provider_pools() {
         let responses = vec![
+            r#"{"private":true}"#,
             r#"{"total_count":1,"workflow_runs":[{"id":10}]}"#,
             r#"{"total_count":1,"workflow_runs":[{"id":11}]}"#,
             r#"{"total_count":2,"jobs":[{"status":"queued","labels":["ubuntu-latest"]},{"status":"queued","labels":["self-hosted","depot-linux"]}]}"#,
@@ -571,6 +601,10 @@ mod tests {
             .collect_plan("secret-token", "owner/repo", &plan)
             .expect("snapshot");
         assert_eq!(snapshot.states.len(), 2);
+        assert_eq!(
+            snapshot.repository_visibility,
+            Some(RepositoryVisibility::Private)
+        );
 
         let github = snapshot
             .states
@@ -589,7 +623,7 @@ mod tests {
         let requests = captured
             .recv_timeout(Duration::from_secs(2))
             .expect("captures");
-        assert_eq!(requests.len(), 4);
+        assert_eq!(requests.len(), 5);
     }
 
     #[test]
