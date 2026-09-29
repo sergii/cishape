@@ -273,6 +273,29 @@ CAPACITY11 follow-up is deferred research: determine a least-privilege GitHub au
 
 Next: package the v0.1 onboarding/advisory experience. The personal-account capacity proof is no longer a v0.1 blocker.
 
+## V0.1 onboarding
+
+Status: ONBOARD1 in progress.
+
+Goal:
+
+```text
+clone/install -> observe -> local history -> deterministic advisory
+```
+
+The default first-run path must require no SaaS account, Jev credential, or account-wide GitHub token. Optional decision-provider and capacity-economics layers are discovered after the deterministic local workflow is understandable.
+
+ONBOARD1:
+
+- put a concise local-first Quickstart near the top of README
+- provide a copy-paste `docs/quickstart.md`
+- document source build/install without claiming an unpublished binary channel
+- make the 10-run evidence gate explicit
+- show the path from observation through report/profile/recommend/explain/advisory
+- keep Jev shadow and provider capacity as optional advanced layers
+
+Next after ONBOARD1: release/package boundary, including the unresolved repository license decision.
+
 ## VS9 - Cloud ingest
 
 Only after local dogfood proves useful:
