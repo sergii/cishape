@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScopeKind;
 use crate::model::{GIB, RunnerShape};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -192,6 +193,8 @@ pub struct RunnerOffer {
     pub execution_model: ExecutionModel,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_visibility: Option<RepositoryVisibility>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_capacity_scope: Option<CapacityScopeKind>,
     pub pricing: OfferPricing,
     pub source_url: String,
     pub observed_at: String,
@@ -333,6 +336,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::ManagedEphemeral,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::PerMinute {
                 usd_per_minute,
                 billing_increment_seconds,
@@ -402,6 +406,7 @@ mod tests {
             architecture: "x86_64".into(),
             execution_model: ExecutionModel::SelfHostedVm,
             repository_visibility: None,
+            required_capacity_scope: None,
             pricing: OfferPricing::FixedServer {
                 usd_per_hour: 0.016,
                 monthly_cap_usd: Some(9.99),
