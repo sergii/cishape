@@ -33,7 +33,10 @@ pub struct ExecutorTarget {
 
 impl ExecutorTarget {
     fn validate(&self) -> Result<()> {
-        anyhow::ensure!(!self.executor_id.trim().is_empty(), "executor_id is required");
+        anyhow::ensure!(
+            !self.executor_id.trim().is_empty(),
+            "executor_id is required"
+        );
         anyhow::ensure!(
             self.max_runner.cpu_millis > 0,
             "executor {} max CPU must be positive",
@@ -122,7 +125,10 @@ impl ExecutorCatalog {
             self.schema_version
         );
         anyhow::ensure!(!self.catalog_id.trim().is_empty(), "catalog_id is required");
-        anyhow::ensure!(!self.targets.is_empty(), "executor catalog must not be empty");
+        anyhow::ensure!(
+            !self.targets.is_empty(),
+            "executor catalog must not be empty"
+        );
 
         let mut ids = BTreeSet::new();
         for target in &self.targets {
@@ -253,7 +259,10 @@ fn fit_target(plan: &ExecutionPlan, target: &ExecutorTarget) -> ExecutorFit {
     if !target.cpu_tenancy.contains(&plan.cpu_tenancy) {
         exclusions.push(BindingExclusion {
             code: ExclusionCode::UnsupportedCpuTenancy,
-            detail: format!("executor does not support {:?} CPU tenancy", plan.cpu_tenancy),
+            detail: format!(
+                "executor does not support {:?} CPU tenancy",
+                plan.cpu_tenancy
+            ),
         });
     }
 
@@ -339,7 +348,7 @@ fn ensure_unique_strings(values: &[String], field: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::execution::{PlacementRequirements, EXECUTION_PLAN_SCHEMA_VERSION};
+    use crate::execution::{EXECUTION_PLAN_SCHEMA_VERSION, PlacementRequirements};
     use crate::model::GIB;
 
     fn plan() -> ExecutionPlan {
