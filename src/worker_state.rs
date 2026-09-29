@@ -35,10 +35,7 @@ impl WorkerPressure {
         );
 
         validate_ratio("cpu_utilization_ratio", self.cpu_utilization_ratio)?;
-        validate_ratio(
-            "memory_utilization_ratio",
-            self.memory_utilization_ratio,
-        )?;
+        validate_ratio("memory_utilization_ratio", self.memory_utilization_ratio)?;
         validate_ratio("io_pressure_ratio", self.io_pressure_ratio)?;
         Ok(())
     }
@@ -213,14 +210,8 @@ pub struct WorkerStateReport {
 }
 
 fn validate_positive_shape(field: &str, shape: &RunnerShape) -> Result<()> {
-    anyhow::ensure!(
-        shape.cpu_millis > 0,
-        "{field} CPU must be positive"
-    );
-    anyhow::ensure!(
-        shape.memory_bytes > 0,
-        "{field} memory must be positive"
-    );
+    anyhow::ensure!(shape.cpu_millis > 0, "{field} CPU must be positive");
+    anyhow::ensure!(shape.memory_bytes > 0, "{field} memory must be positive");
     Ok(())
 }
 
