@@ -184,6 +184,29 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Collect GitHub-hosted runner capacity across an authenticated personal account.
+    CapacityGithubAccount {
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long)]
+        offer_id: String,
+        #[arg(long)]
+        runner_label: String,
+        #[arg(long)]
+        parallel_slots: u32,
+        #[arg(long)]
+        slot_turnover_ms: u64,
+        #[arg(long, value_enum)]
+        cache_state: CapacityCacheArg,
+        #[arg(long)]
+        cache_penalty_ms: u64,
+        #[arg(long, default_value = "CISHAPE_GITHUB_ACCOUNT_TOKEN")]
+        token_env: String,
+        #[arg(long)]
+        api_base: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Collect several configured GitHub Actions runner pools in one snapshot.
     CapacityGithubPlan {
         #[arg(long)]
@@ -412,6 +435,30 @@ fn main() -> Result<()> {
         } => capacity_github_command(
             repository.as_deref(),
             (&provider, &offer_id, &runner_label),
+            (
+                parallel_slots,
+                slot_turnover_ms,
+                cache_state,
+                cache_penalty_ms,
+            ),
+            &token_env,
+            api_base.as_deref(),
+            output.as_deref(),
+        ),
+        Command::CapacityGithubAccount {
+            repository,
+            offer_id,
+            runner_label,
+            parallel_slots,
+            slot_turnover_ms,
+            cache_state,
+            cache_penalty_ms,
+            token_env,
+            api_base,
+            output,
+        } => capacity_github_account_command(
+            repository.as_deref(),
+            (&offer_id, &runner_label),
             (
                 parallel_slots,
                 slot_turnover_ms,
@@ -816,6 +863,68 @@ fn capacity_github_command(
         println!("  queued            {}", state.queue_depth);
         println!("  running           {}", state.running_jobs);
         println!("  parallel slots    {}", state.parallel_slots);
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn capacity_github_account_command(
+    repository: Option<&str>,
+    identity: (&str, &str),
+    capacity: (u32, u64, CapacityCacheArg, u64),
+    token_env: &str,
+    api_base: Option<&str>,
+    output: Option<&Path>,
+) -> Result<()> {
+    let repository = repository
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_REPOSITORY").ok())
+        .context("repository is required via --repository or GITHUB_REPOSITORY")?;
+    let api_base = api_base
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_API_URL").ok())
+        .unwrap_or_else(|| DEFAULT_GITHUB_API_BASE.into());
+    let token = std::env::var(token_env).with_context(|| {
+        format!("missing GitHub account token in environment variable {token_env}")
+    })?;
+    let (offer_id, runner_label) = identity;
+    let (parallel_slots, slot_turnover_ms, cache_state, cache_penalty_ms) = capacity;
+
+    let config = GitHubCapacityConfig {
+        repository,
+        provider: "github-actions".into(),
+        offer_id: offer_id.into(),
+        runner_label: runner_label.into(),
+        parallel_slots,
+        slot_turnover_ms,
+        cache_state: cache_state.into(),
+        cache_penalty_ms,
+    };
+    let snapshot = GitHubCapacityClient::new(api_base).collect_account(&token, &config)?;
+    let payload = serde_json::to_string_pretty(&snapshot)
+        .context("serialize GitHub account CapacitySnapshot")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        let state = snapshot.states.first().expect("account adapter emits one state");
+        let scope = state
+            .capacity_scope
+            .as_ref()
+            .expect("account adapter emits capacity scope");
+        println!(
+            "wrote GitHub personal-account capacity snapshot to {}",
+            path.display()
+        );
+        println!("  target repository {}", config.repository);
+        println!("  account scope      {}:{}", scope.kind, scope.key);
+        println!("  runner label       {}", config.runner_label);
+        println!("  queued             {}", state.queue_depth);
+        println!("  running            {}", state.running_jobs);
+        println!("  parallel slots     {}", state.parallel_slots);
     } else {
         println!("{payload}");
     }
