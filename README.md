@@ -14,6 +14,36 @@ CPU8-MEM16  = 8 vCPU / 16 GiB RAM
 
 CPU and memory remain separate dimensions. External machine-readable IDs use lowercase hyphenated forms such as `cpu8-mem16`; human-facing output uses `CPU8-MEM16`.
 
+## Quickstart
+
+The default v0.1 path is local-first and deterministic. It does **not** require a CIShape account, SaaS backend, Jev API key, or GitHub account-wide token.
+
+Build/install from the current checkout:
+
+```bash
+cargo install --path .
+```
+
+Observe one real workload and inspect the evidence:
+
+```bash
+cishape observe --job test -- cargo test
+cishape report
+cishape profile test
+```
+
+The default policy requires 10 representative observations before optimization becomes actionable. Once enough normal history exists:
+
+```bash
+cishape recommend test
+cishape explain test
+cishape advisory --format markdown
+```
+
+CIShape remains read-only: it observes and recommends; it does not rewrite `runs-on` or reroute CI jobs.
+
+See the copy-paste [v0.1 quickstart](docs/quickstart.md) for the complete first-run flow and the optional Jev/capacity layers.
+
 ## POC0
 
 The first vertical slice is intentionally local and synthetic:
@@ -130,7 +160,7 @@ cargo run -- decision-run \
 
 The live adapter uses the official TypeSafe System One endpoint by default, stores the raw response as evidence, and then runs the same fail-closed JEV1 validation. Shadow decisions have no CI execution side effects.
 
-For a reproducible first live proof, the repository also contains a manual-only `Jev Shadow Proof` GitHub Actions workflow. It consumes the latest rolling CIShape history artifact and requires only a repository secret named `JEV_API_KEY`.
+The repository also contains a manual-only `Jev Shadow Proof` GitHub Actions workflow. LIVE1 has been proven against real rolling CIShape history: 24 `test` runs produced two feasible candidates, and Jev 1.13.0 selected the same `cpu8-mem16` candidate as the deterministic baseline at 0.88 confidence. The workflow remains shadow-only and requires a repository secret named `JEV_API_KEY`.
 
 ## Provider catalog
 
@@ -252,6 +282,7 @@ CIShape is not a CI control plane. GitHub Actions, Buildkite, GitLab, Jenkins, a
 
 See:
 
+- [v0.1 quickstart](docs/quickstart.md)
 - [Architecture](docs/architecture.md)
 - [RFC-0001](docs/rfc/0001-poc-and-core-model.md)
 - [Roadmap](docs/roadmap.md)
