@@ -76,6 +76,10 @@ impl ReservationRequest {
             self.schema_version
         );
         anyhow::ensure!(!self.request_id.trim().is_empty(), "request_id is required");
+        anyhow::ensure!(
+            self.lease_id == self.request_id,
+            "lease_id must equal request_id for deterministic idempotency identity"
+        );
         anyhow::ensure!(!self.worker_id.trim().is_empty(), "worker_id is required");
         anyhow::ensure!(
             self.expected_worker_state_revision > 0,
