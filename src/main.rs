@@ -19,6 +19,10 @@ use cishape::economics_policy::{
     workflow_decision_to_markdown,
 };
 use cishape::execution::{ExecutionRequirements, plan as plan_execution};
+use cishape::executor::{
+    BoxdCliBackend, CleanupStatus, ExecutionCompletion, ExecutionRecord, ExecutionStatus,
+    ExecutorBackend,
+};
 use cishape::github_capacity::{
     DEFAULT_GITHUB_API_BASE, GitHubCapacityClient, GitHubCapacityConfig, GitHubCapacityPlan,
 };
@@ -42,6 +46,7 @@ use cishape::worker_state::WorkerStateSnapshot;
 use cishape::workflow::{WorkflowDemand, evaluate as evaluate_workflow_economics};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Parser)]
 #[command(name = "cishape")]
@@ -519,6 +524,21 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Claim an active lease and execute one command in an isolated Boxd microVM.
+    ExecutorRunBoxd {
+        #[arg(long, default_value = ".cishape/reservations.duckdb")]
+        db: PathBuf,
+        #[arg(long)]
+        lease_id: String,
+        #[arg(long)]
+        execution_id: String,
+        #[arg(long, default_value = "boxd")]
+        boxd_binary: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(last = true, required = true, num_args = 1..)]
+        command: Vec<String>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -865,6 +885,21 @@ fn main() -> Result<()> {
             now_unix_ms,
             output,
         } => reservation_store_expire_command(&db, &worker_id, now_unix_ms, output.as_deref()),
+        Command::ExecutorRunBoxd {
+            db,
+            lease_id,
+            execution_id,
+            boxd_binary,
+            output,
+            command,
+        } => executor_run_boxd_command(
+            &db,
+            &lease_id,
+            &execution_id,
+            &boxd_binary,
+            output.as_deref(),
+            &command,
+        ),
         Command::Explain {
             db,
             repository,
@@ -1738,6 +1773,165 @@ fn reservation_store_expire_command(
     let mut store = DuckDbReservationStore::open(db)?;
     let transition = store.expire_due(worker_id, now_unix_ms)?;
     write_reservation_transition(&transition, output)
+}
+
+fn executor_run_boxd_command(
+    db: &Path,
+    lease_id: &str,
+    execution_id: &str,
+    boxd_binary: &Path,
+    output: Option<&Path>,
+    command: &[String],
+) -> Result<()> {
+    let mut store = DuckDbReservationStore::open(db)?;
+    let ledger = store.ledger()?;
+    let lease = ledger
+        .leases
+        .iter()
+        .find(|lease| lease.lease_id == lease_id)
+        .with_context(|| format!("lease {lease_id} not found"))?
+        .clone();
+
+    let backend = BoxdCliBackend::with_binary(boxd_binary);
+    backend.validate_plan(&lease.plan)?;
+
+    let claimed = store.claim_execution(
+        lease_id,
+        execution_id,
+        backend.kind(),
+        command,
+        unix_time_ms()?,
+    )?;
+
+    if claimed.terminal() {
+        write_execution_record(&claimed, output)?;
+        anyhow::ensure!(
+            claimed.status == ExecutionStatus::Succeeded,
+            "execution {execution_id} is already failed"
+        );
+        return Ok(());
+    }
+
+    anyhow::ensure!(
+        claimed.status == ExecutionStatus::Starting,
+        "execution {execution_id} is already {:?}; automatic recovery is not implemented",
+        claimed.status
+    );
+
+    let handle = match backend.create(execution_id, &claimed.plan) {
+        Ok(handle) => handle,
+        Err(error) => {
+            let completion = ExecutionCompletion {
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                error: Some(format!("backend create failed: {error:#}")),
+                cleanup: CleanupStatus::NotAttempted,
+            };
+            let failed =
+                store.finish_execution(execution_id, &completion, unix_time_ms()?)?;
+            write_execution_record(&failed, output)?;
+            anyhow::bail!("execution {execution_id} failed during backend create");
+        }
+    };
+
+    let running = match store.mark_execution_running(
+        execution_id,
+        &handle.resource_id,
+        unix_time_ms()?,
+    ) {
+        Ok(running) => running,
+        Err(error) => {
+            let cleanup_error = backend.destroy(&handle).err();
+            let cleanup = if cleanup_error.is_some() {
+                CleanupStatus::Failed
+            } else {
+                CleanupStatus::Succeeded
+            };
+            let error_text = match cleanup_error {
+                Some(cleanup_error) => format!(
+                    "persist RUNNING failed: {error:#}; backend cleanup failed: {cleanup_error:#}"
+                ),
+                None => format!("persist RUNNING failed: {error:#}"),
+            };
+            let completion = ExecutionCompletion {
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                error: Some(error_text),
+                cleanup,
+            };
+            let _ = store.finish_execution(execution_id, &completion, unix_time_ms()?);
+            return Err(error);
+        }
+    };
+
+    let command_result = backend.exec(&handle, &running.command);
+    let cleanup_result = backend.destroy(&handle);
+
+    let (exit_code, stdout, stderr, mut error) = match command_result {
+        Ok(result) => (
+            Some(result.exit_code),
+            result.stdout,
+            result.stderr,
+            None,
+        ),
+        Err(error) => (
+            None,
+            String::new(),
+            String::new(),
+            Some(format!("backend exec failed: {error:#}")),
+        ),
+    };
+
+    let cleanup = match cleanup_result {
+        Ok(()) => CleanupStatus::Succeeded,
+        Err(cleanup_error) => {
+            let cleanup_message = format!("backend cleanup failed: {cleanup_error:#}");
+            error = Some(match error {
+                Some(existing) => format!("{existing}; {cleanup_message}"),
+                None => cleanup_message,
+            });
+            CleanupStatus::Failed
+        }
+    };
+
+    let completion = ExecutionCompletion {
+        exit_code,
+        stdout,
+        stderr,
+        error,
+        cleanup,
+    };
+    let finished = store.finish_execution(execution_id, &completion, unix_time_ms()?)?;
+    write_execution_record(&finished, output)?;
+
+    anyhow::ensure!(
+        finished.status == ExecutionStatus::Succeeded,
+        "execution {execution_id} failed"
+    );
+    Ok(())
+}
+
+fn write_execution_record(record: &ExecutionRecord, output: Option<&Path>) -> Result<()> {
+    let payload = serde_json::to_string_pretty(record).context("serialize ExecutionRecord")?;
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote execution record to {}", path.display());
+    } else {
+        println!("{payload}");
+    }
+    Ok(())
+}
+
+fn unix_time_ms() -> Result<u64> {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before Unix epoch")?
+        .as_millis();
+    u64::try_from(millis).context("Unix timestamp exceeds u64")
 }
 
 fn decide_command(
