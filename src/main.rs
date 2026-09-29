@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::admission::{AdmissionPolicy, evaluate as evaluate_admission};
+use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::batch::evaluate as evaluate_batch_economics;
 use cishape::binding::{BindingReport, ExecutorCatalog, fit as fit_execution};
 use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
@@ -699,13 +699,7 @@ fn main() -> Result<()> {
             workers,
             policy,
             output,
-        } => admission_command(
-            &plan,
-            &binding,
-            &workers,
-            &policy,
-            output.as_deref(),
-        ),
+        } => admission_command(&plan, &binding, &workers, &policy, output.as_deref()),
         Command::Explain {
             db,
             repository,
