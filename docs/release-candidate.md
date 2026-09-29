@@ -10,7 +10,7 @@ It:
 
 - checks out the exact workflow-dispatch commit
 - requires the dispatch ref to be `main`
-- builds `cishape` with `cargo build --release --locked`
+- resolves a fresh dependency lock once for the run, records its SHA-256, then builds `cishape` with `cargo build --release --locked`
 - smoke-tests `cishape --help` and `cishape demo`
 - packages the binary with README and the v0.1 quickstart
 - emits a SHA-256 checksum
@@ -41,6 +41,7 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu/
   cishape
   README.md
   QUICKSTART.md
+  Cargo.lock
 ```
 
 The workflow also uploads:
@@ -50,7 +51,9 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
 cishape-v0.1.0-x86_64-unknown-linux-gnu.manifest.json
 ```
 
-The manifest records the version, target, repository, exact commit SHA, workflow run/attempt, archive filename, and archive SHA-256.
+The manifest records the version, target, repository, exact commit SHA, workflow run/attempt, archive filename/checksum, and the SHA-256 of the generated `Cargo.lock`.
+
+The repository does not yet commit `Cargo.lock`. RELEASE1 therefore freezes the dependency graph at the start of each candidate run and preserves that exact lockfile inside the archive. This makes the produced candidate reconstructable, but a future release-hardening slice should decide whether the application lockfile becomes a committed repository input.
 
 ## Verify locally
 

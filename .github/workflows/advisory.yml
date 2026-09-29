@@ -91,17 +91,22 @@ jobs:
           mkdir -p .cishape/advisory/history
 
           artifact_id="$(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-              --jq '[.artifacts[]
+            gh api --paginate --slurp \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              --jq '[.[]
+                | .artifacts[]
                 | select(.expired == false)
                 | select(.name | startswith("cishape-history-"))]
-                | sort_by(.created_at)
-                | reverse
-                | .[0].id // empty'
+                | max_by(.created_at)
+                | .id // empty'
           )"
 
           if [ -z "${artifact_id}" ]; then
             echo "No non-expired cishape-history-* artifact is available." >&2
+            exit 1
+          fi
+          if ! [[ "${artifact_id}" =~ ^[0-9]+$ ]]; then
+            echo "Expected exactly one numeric history artifact ID, got: ${artifact_id@Q}" >&2
             exit 1
           fi
 
