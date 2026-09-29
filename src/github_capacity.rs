@@ -630,7 +630,10 @@ mod tests {
             Some(&CapacityScopeKind::Repository)
         );
         assert_eq!(
-            depot.capacity_scope.as_ref().map(|scope| scope.key.as_str()),
+            depot
+                .capacity_scope
+                .as_ref()
+                .map(|scope| scope.key.as_str()),
             Some("owner/repo")
         );
 
