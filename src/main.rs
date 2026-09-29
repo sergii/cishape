@@ -33,6 +33,7 @@ use cishape::policy::OptimizationPolicy;
 use cishape::store::Store;
 use cishape::synthetic;
 use cishape::workflow::{WorkflowDemand, evaluate as evaluate_workflow_economics};
+use cishape::worker_state::WorkerStateSnapshot;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
 
@@ -405,6 +406,13 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Inspect a read-only snapshot of concrete execution-worker capacity.
+    WorkerState {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -668,6 +676,9 @@ fn main() -> Result<()> {
             catalog,
             output,
         } => execution_fit_command(&plan, &catalog, output.as_deref()),
+        Command::WorkerState { snapshot, output } => {
+            worker_state_command(&snapshot, output.as_deref())
+        }
         Command::Explain {
             db,
             repository,
@@ -1353,6 +1364,23 @@ fn execution_fit_command(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote execution binding report to {}", path.display());
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn worker_state_command(snapshot_path: &Path, output: Option<&Path>) -> Result<()> {
+    let snapshot = WorkerStateSnapshot::load(snapshot_path)?;
+    let report = snapshot.report();
+    let payload = serde_json::to_string_pretty(&report).context("serialize WorkerStateReport")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote worker-state report to {}", path.display());
     } else {
         println!("{payload}");
     }
