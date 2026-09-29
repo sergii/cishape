@@ -499,8 +499,8 @@ impl ExecutorBackend for BoxdCliBackend {
         anyhow::ensure!(
             plan.target_runner == self.exact_shape,
             "Boxd public default proof requires exact runner shape {}; got {}",
-            self.exact_shape.external_id(),
-            plan.target_runner.external_id()
+            self.exact_shape.id(),
+            plan.target_runner.id()
         );
         Ok(())
     }
