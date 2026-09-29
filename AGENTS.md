@@ -55,6 +55,9 @@ CIShape may emit provider-neutral advisory execution plans for another control p
 - An ExecutionPlan is advisory evidence only. Provisioning, runner registration, scheduling, and workflow mutation remain control-plane responsibilities.
 - Executor catalogs describe static/configuration-level capabilities only. Keep live worker availability, queue depth, free resources, cache warmth, and liveness in separate runtime evidence.
 - Capability compatibility is not executor selection. If several executors fit, preserve the compatible set unless an explicit versioned selection/scheduling policy with the required evidence is present.
+- Keep provider-offer queue/economics capacity separate from concrete worker/host runtime state. CapacitySnapshot and WorkerStateSnapshot answer different questions.
+- Worker physical capacity, configured allocation limits, and current allocations are distinct evidence. Never infer an oversubscription ratio from physical CPU count.
+- Worker pressure observations are evidence only until an explicit versioned admission policy defines thresholds and behavior.
 - The local-first path must remain useful without signup or a network service.
 
 ## Delivery sequence

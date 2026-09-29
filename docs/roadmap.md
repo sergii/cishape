@@ -493,6 +493,33 @@ BINDING1:
 
 Next execution-plane step: add live worker/pool state and admission evidence before any scheduling or reservation behavior.
 
+## VS10.7 - Worker runtime state
+
+Status: WORKERSTATE1 implemented.
+
+Goal:
+
+```text
+concrete workers
+  -> WorkerStateSnapshot
+  -> deterministic WorkerStateReport
+```
+
+WORKERSTATE1:
+
+- keep concrete host runtime state separate from static ExecutorCatalog capabilities
+- keep worker state separate from provider-offer CapacitySnapshot queue/economics evidence
+- model concrete worker and executor identities
+- record physical CPU/RAM separately from explicit allocation limits
+- permit explicit allocation limits to differ from physical capacity without inventing oversubscription defaults
+- record current allocated CPU/RAM and running/max allocation counts
+- record ready/draining/offline lifecycle
+- accept optional normalized CPU/memory/IO pressure evidence without interpreting thresholds
+- derive free allocation capacity and structural `accepting_new_work`
+- remain read-only with no admission, reservation, scheduling, provisioning, or runner registration
+
+Next: ADMISSION1 - combine ExecutionPlan + BindingReport + WorkerStateSnapshot + versioned AdmissionPolicy to determine which compatible workers can safely accept a workload now.
+
 ## VS11 - Controlled routing
 
 Only after advisory recommendations, execution plans, capability binding, and live capacity evidence prove reliable, allow opt-in automation through existing CI control planes.
