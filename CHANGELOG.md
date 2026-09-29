@@ -6,6 +6,14 @@ The project follows Conventional Commits and will generate release changelogs de
 
 ## [Unreleased]
 
+## [0.1.2]
+
+### Bug Fixes
+
+- Keep current-runner cost and savings explicitly unknown when the current runner shape has no known price in the internal catalog, instead of substituting the recommended runner rate and fabricating a savings percentage.
+- Remove the stale README statement that incorrectly said the repository had no selected license.
+
+
 ## [0.1.1]
 
 ### Bug Fixes
