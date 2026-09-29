@@ -1,5 +1,5 @@
 use crate::catalog::RepositoryVisibility;
-use crate::economics::{CapacitySnapshot, EconomicsReport};
+use crate::economics::{CapacityScope, CapacitySnapshot, EconomicsReport};
 use crate::model::RunnerShape;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,8 @@ pub struct BatchEconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
     pub offer_shape: RunnerShape,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<CapacityScope>,
     pub parallel_jobs: u32,
     pub effective_runtime_ms: u64,
     pub first_job_start_ms: u64,
@@ -70,6 +72,7 @@ pub fn evaluate(
             provider: base.provider.clone(),
             offer_id: base.offer_id.clone(),
             offer_shape: base.offer_shape.clone(),
+            scope: base.scope.clone(),
             parallel_jobs,
             effective_runtime_ms: base.effective_runtime_ms,
             first_job_start_ms: schedule.first_job_start_ms,
@@ -200,14 +203,19 @@ pub fn to_markdown(report: &BatchEconomicsReport) -> String {
         output.push_str(&format!("- Repository visibility: `{visibility}`\n"));
     }
     output.push_str(&format!("- Jobs: {}\n\n", report.parallel_jobs));
-    output.push_str("| Provider | Offer | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
-    output.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
+    output.push_str("| Provider | Offer | Scope | Jobs | First start | Last start | Time-to-green | Per-job cost | Total cost | Pareto |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
 
     for evaluation in &report.evaluations {
         output.push_str(&format!(
-            "| {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
+            "| {} | {} | {} | {} | {:.2}s | {:.2}s | {:.2}s | ${:.6} | ${:.6} | {} |\n",
             evaluation.provider,
             evaluation.offer_id,
+            evaluation
+                .scope
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "-".into()),
             evaluation.parallel_jobs,
             evaluation.first_job_start_ms as f64 / 1000.0,
             evaluation.last_job_start_ms as f64 / 1000.0,
