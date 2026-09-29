@@ -1,4 +1,5 @@
-use cishape::catalog::ProviderCatalog;
+use cishape::capacity_scope::{CapacityScope, CapacityScopeKind};
+use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::economics::CapacitySnapshot;
 use cishape::economics_policy::{EconomicsPolicy, select_workflow};
 use cishape::workflow::{WorkflowDemand, evaluate};
@@ -50,6 +51,42 @@ fn fan_out_fan_in_records_the_deterministic_schedule() {
     assert_eq!((branch_a.start_ms, branch_a.finish_ms), (2_000, 10_000));
     assert_eq!((integrate.start_ms, integrate.finish_ms), (10_000, 16_000));
     assert_eq!((e2e.start_ms, e2e.finish_ms), (16_000, 20_000));
+}
+
+#[test]
+fn workflow_skips_offer_when_concurrency_scope_is_too_narrow() {
+    let catalog =
+        ProviderCatalog::load(&repo_path("catalogs/providers-v1.json")).expect("provider catalog");
+    let mut snapshot =
+        CapacitySnapshot::load(&repo_path("examples/workflow-capacity-snapshot-v1.json"))
+            .expect("capacity snapshot");
+    let workflow = WorkflowDemand::load(&repo_path("examples/workflow-demand-v1.json"))
+        .expect("workflow demand");
+
+    snapshot.repository_visibility = Some(RepositoryVisibility::Public);
+    let github = snapshot
+        .states
+        .iter_mut()
+        .find(|state| state.provider == "github-actions")
+        .expect("github state");
+    github.offer_id = "ubuntu-latest-public-x64".into();
+    github.capacity_scope = Some(CapacityScope {
+        kind: CapacityScopeKind::Repository,
+        key: "sergii/cishape".into(),
+    });
+
+    let report = evaluate(&catalog, &snapshot, &workflow).expect("workflow economics");
+
+    assert!(
+        report
+            .evaluations
+            .iter()
+            .all(|item| item.offer_id != "ubuntu-latest-public-x64")
+    );
+    assert!(report.skipped.iter().any(|item| {
+        item.offer_id == "ubuntu-latest-public-x64"
+            && item.reason.contains("requires provider_account capacity scope")
+    }));
 }
 
 #[test]
