@@ -387,7 +387,7 @@ CIShape v0.1.0 is the completed OSS/local-first milestone. Further cloud ingest,
 
 ## V0.1.1 packaging patch
 
-Status: RELEASE3 in progress.
+Status: RELEASE3 complete.
 
 Manual acceptance of the public v0.1.0 artifact found two distribution bugs:
 
@@ -401,6 +401,21 @@ RELEASE3:
 - generate portable checksum files using only the archive basename
 - add an extracted-package acceptance gate for observe/report/profile/recommend/explain/advisory/catalog
 - publish a new `v0.1.1` tag/release without mutating v0.1.0
+
+## V0.1.2 cost-evidence patch
+
+Status: RELEASE4 in progress.
+
+Manual acceptance of v0.1.1 exposed a fail-open cost-reporting path when the observed current runner shape was not present in the internal candidate catalog.
+
+RELEASE4:
+
+- keep current estimated cost unknown when no current runner rate is known
+- keep estimated savings unknown in the same case
+- preserve known recommended candidate cost
+- regression-test both known-current and unknown-current pricing paths
+- remove the stale duplicate README license warning
+- publish a new `v0.1.2` tag/release without mutating earlier releases
 
 ## VS9 - Cloud ingest
 
