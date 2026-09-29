@@ -234,15 +234,19 @@ RESERVATIONSTORE1 does not add:
 
 ## Next boundary
 
-The first real executor proof can now consume an active lease from the single-authority store.
+EXECUTOR1 now consumes an active lease through the same authoritative database.
 
-The next domain transition should make execution ownership explicit:
+The execution claim transaction atomically:
 
-```text
-RESERVED
-  -> STARTING
-  -> RUNNING
-  -> FINISHED / FAILED
-```
+- marks the lease claimed;
+- converts reserved CPU/RAM/count into running allocation;
+- advances worker revision;
+- inserts ExecutionRecord(STARTING).
 
-The `RESERVED -> STARTING` transition must atomically convert reserved accounting into execution ownership before a Boxd/Firecracker process is launched.
+Execution completion atomically returns running allocation and persists terminal execution evidence.
+
+The reservation database therefore now stores a third authoritative record class: `executions`.
+
+See `docs/executor.md`.
+
+Crash reconciliation and a multi-instance Postgres-class store remain follow-up work.
