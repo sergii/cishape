@@ -6,6 +6,14 @@ The project follows Conventional Commits and will generate release changelogs de
 
 ## [Unreleased]
 
+## [0.1.1]
+
+### Bug Fixes
+
+- Include the default `policies/` and `catalogs/` runtime data in the Linux release archive so standalone `recommend`, `explain`, `advisory`, and catalog commands work from the extracted package.
+- Write release checksum files with the archive basename so `shasum -a 256 -c` and `sha256sum -c` work after downloading assets into a normal directory.
+
+
 ### Features
 
 - Bootstrap the local-first synthetic CI workload shaping proof of concept.

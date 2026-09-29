@@ -37,6 +37,20 @@ Requirements:
 
 Resource observation is Linux-first. The portable history, profiling, advisory, decision, and economics layers are platform-neutral once observations exist.
 
+## Using the GitHub release package
+
+The published Linux archive is self-contained for the default CLI paths. After extracting it, run CIShape **from the extracted package directory** so the bundled `policies/` and `catalogs/` directories are available:
+
+```bash
+tar -xzf cishape-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
+cd cishape-v0.1.1-x86_64-unknown-linux-gnu
+
+./cishape --help
+./cishape catalog
+```
+
+The package contains the binary, README/Quickstart, project and third-party licenses, exact generated `Cargo.lock`, `policies/`, and `catalogs/`.
+
 ## 2. Observe one real workload
 
 Wrap a command that represents one logical CI job:

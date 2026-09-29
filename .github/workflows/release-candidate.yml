@@ -103,9 +103,14 @@ jobs:
           cp LICENSE "dist/${PACKAGE}/LICENSE"
           cp .cishape/release/THIRD_PARTY_LICENSES.html "dist/${PACKAGE}/THIRD_PARTY_LICENSES.html"
           cp Cargo.lock "dist/${PACKAGE}/Cargo.lock"
+          cp -R policies "dist/${PACKAGE}/policies"
+          cp -R catalogs "dist/${PACKAGE}/catalogs"
 
           tar -C dist -czf "dist/${PACKAGE}.tar.gz" "${PACKAGE}"
-          sha256sum "dist/${PACKAGE}.tar.gz" > "dist/${PACKAGE}.tar.gz.sha256"
+          (
+            cd dist
+            sha256sum "${PACKAGE}.tar.gz" > "${PACKAGE}.tar.gz.sha256"
+          )
 
           archive_sha256="$(awk '{print $1}' "dist/${PACKAGE}.tar.gz.sha256")"
           license_sha256="$(sha256sum "dist/${PACKAGE}/LICENSE" | awk '{print $1}')"

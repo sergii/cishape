@@ -45,6 +45,8 @@ cishape-v0.1.0-x86_64-unknown-linux-gnu/
   LICENSE
   THIRD_PARTY_LICENSES.html
   Cargo.lock
+  policies/
+  catalogs/
 ```
 
 The workflow also uploads:
@@ -65,6 +67,8 @@ The release path uses `cargo-about 0.9.2` from its pinned Linux release artifact
 The checked-in `about.toml` is fail-closed: dependencies whose detected licenses are not explicitly accepted stop CI/release packaging for review. The generated `THIRD_PARTY_LICENSES.html` records dependency package names/versions and detected full license texts.
 
 This report is distribution/compliance evidence, not legal advice.
+
+The checksum file stores the archive basename rather than a build-directory path, so it can be verified directly after downloading release assets into one directory.
 
 ## Verify locally
 
