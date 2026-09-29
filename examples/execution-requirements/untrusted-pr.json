@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "requirements_id": "untrusted-pr-v1",
+  "code_trust": "untrusted",
+  "minimum_isolation": "container",
+  "cpu_tenancy": "shared",
+  "host_tenancy": "shared",
+  "cache": "warm_preferred",
+  "max_parallelism": 4,
+  "placement": {
+    "architecture": "x86_64",
+    "required_capabilities": []
+  }
+}
