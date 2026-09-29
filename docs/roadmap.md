@@ -310,7 +310,7 @@ RELEASE1:
 
 - manual-only Linux x86_64 release-candidate workflow
 - derive version from Cargo metadata
-- build with the pinned toolchain and lockfile
+- resolve the dependency graph once per candidate run, preserve the generated `Cargo.lock`, and build with `--locked`
 - smoke the release binary
 - package binary + README + quickstart
 - generate SHA-256 checksum and provenance manifest
