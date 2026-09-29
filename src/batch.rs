@@ -1,3 +1,4 @@
+use crate::capacity_scope::CapacityScope;
 use crate::catalog::RepositoryVisibility;
 use crate::economics::{CapacitySnapshot, EconomicsReport};
 use crate::model::RunnerShape;
@@ -10,6 +11,8 @@ pub const BATCH_ECONOMICS_REPORT_SCHEMA_VERSION: u32 = 1;
 pub struct BatchEconomicsEvaluation {
     pub provider: String,
     pub offer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_scope: Option<CapacityScope>,
     pub offer_shape: RunnerShape,
     pub parallel_jobs: u32,
     pub effective_runtime_ms: u64,
@@ -69,6 +72,7 @@ pub fn evaluate(
         evaluations.push(BatchEconomicsEvaluation {
             provider: base.provider.clone(),
             offer_id: base.offer_id.clone(),
+            capacity_scope: base.capacity_scope.clone(),
             offer_shape: base.offer_shape.clone(),
             parallel_jobs,
             effective_runtime_ms: base.effective_runtime_ms,
