@@ -129,6 +129,19 @@ WORKERSTATE1 derives free allocation capacity and whether a worker is structural
 
 See `docs/worker-state.md`.
 
+
+### Worker admission
+
+ADMISSION1 combines the exact `ExecutionPlan`, its `BindingReport`, a time-scoped `WorkerStateSnapshot`, and a versioned `AdmissionPolicy`.
+
+The binding report embeds the plan that produced it, so downstream evaluation fails closed on stale or mismatched capability evidence.
+
+Admission checks concrete runtime eligibility without choosing or mutating a worker. CPU and memory capacity basis, reserves, and pressure thresholds come from policy data rather than hidden code. The default policy uses physical capacity as the ceiling; configured allocation limits above physical capacity are used only when policy explicitly selects that basis.
+
+`admit` means one or more workers are eligible at the snapshot instant. It is not a reservation guarantee. A future atomic reservation/lease boundary is required before execution.
+
+See `docs/admission.md`.
+
 ## Telemetry interoperability
 
 Prefer OpenTelemetry CI/CD semantic conventions for shared vocabulary where applicable.

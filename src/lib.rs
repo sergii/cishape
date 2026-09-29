@@ -1,3 +1,4 @@
+pub mod admission;
 pub mod advisory;
 pub mod batch;
 pub mod binding;

@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
+use cishape::admission::{AdmissionPolicy, evaluate as evaluate_admission};
 use cishape::advisory::{ADVISORY_SCHEMA_VERSION, AdvisoryReport, advisory_item, to_markdown};
 use cishape::batch::evaluate as evaluate_batch_economics;
-use cishape::binding::{ExecutorCatalog, fit as fit_execution};
+use cishape::binding::{BindingReport, ExecutorCatalog, fit as fit_execution};
 use cishape::catalog::{ProviderCatalog, RepositoryVisibility};
 use cishape::decision::{
     JevRequestBundle, JevSystemOneResponse, prepare_jev_request, record_deterministic_decision,
@@ -413,6 +414,19 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Evaluate which compatible workers are admissible now without reserving capacity.
+    Admission {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        binding: PathBuf,
+        #[arg(long)]
+        workers: PathBuf,
+        #[arg(long, default_value = "policies/admission-default-v1.json")]
+        policy: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain the deterministic recommendation and its safety margins.
     Explain {
         #[arg(long, default_value = ".cishape/cishape.duckdb")]
@@ -679,6 +693,13 @@ fn main() -> Result<()> {
         Command::WorkerState { snapshot, output } => {
             worker_state_command(&snapshot, output.as_deref())
         }
+        Command::Admission {
+            plan,
+            binding,
+            workers,
+            policy,
+            output,
+        } => admission_command(&plan, &binding, &workers, &policy, output.as_deref()),
         Command::Explain {
             db,
             repository,
@@ -1381,6 +1402,32 @@ fn worker_state_command(snapshot_path: &Path, output: Option<&Path>) -> Result<(
         std::fs::write(path, payload.as_bytes())
             .with_context(|| format!("write {}", path.display()))?;
         println!("wrote worker-state report to {}", path.display());
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(())
+}
+
+fn admission_command(
+    plan_path: &Path,
+    binding_path: &Path,
+    workers_path: &Path,
+    policy_path: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
+    let plan = cishape::execution::ExecutionPlan::load(plan_path)?;
+    let binding = BindingReport::load(binding_path)?;
+    let workers = WorkerStateSnapshot::load(workers_path)?;
+    let policy = AdmissionPolicy::load(policy_path)?;
+    let report = evaluate_admission(&plan, &binding, &workers, &policy)?;
+    let payload = serde_json::to_string_pretty(&report).context("serialize AdmissionReport")?;
+
+    if let Some(path) = output {
+        ensure_parent(path)?;
+        std::fs::write(path, payload.as_bytes())
+            .with_context(|| format!("write {}", path.display()))?;
+        println!("wrote admission report to {}", path.display());
     } else {
         println!("{payload}");
     }

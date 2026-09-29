@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub const EXECUTOR_CATALOG_SCHEMA_VERSION: u32 = 1;
-pub const BINDING_REPORT_SCHEMA_VERSION: u32 = 1;
+pub const BINDING_REPORT_SCHEMA_VERSION: u32 = 2;
 pub const BINDING_ALGORITHM_VERSION: &str = "executor-fit-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -186,15 +186,85 @@ pub struct ExecutorFit {
     pub preferences: Vec<BindingPreference>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindingReport {
     pub schema_version: u32,
     pub algorithm: String,
     pub catalog_id: String,
     pub job: String,
     pub repository: Option<String>,
+    pub plan: ExecutionPlan,
     pub compatible_executor_ids: Vec<String>,
     pub fits: Vec<ExecutorFit>,
+}
+
+impl BindingReport {
+    pub fn load(path: &Path) -> Result<Self> {
+        let bytes = std::fs::read(path)
+            .with_context(|| format!("read binding report {}", path.display()))?;
+        let report: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse binding report {}", path.display()))?;
+        report.validate()?;
+        Ok(report)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            self.schema_version == BINDING_REPORT_SCHEMA_VERSION,
+            "unsupported binding report schema version {}",
+            self.schema_version
+        );
+        anyhow::ensure!(
+            !self.algorithm.trim().is_empty(),
+            "binding algorithm is required"
+        );
+        anyhow::ensure!(!self.catalog_id.trim().is_empty(), "catalog_id is required");
+        anyhow::ensure!(!self.job.trim().is_empty(), "binding job is required");
+        self.plan.validate()?;
+        anyhow::ensure!(
+            self.job == self.plan.job,
+            "binding job does not match embedded ExecutionPlan"
+        );
+        anyhow::ensure!(
+            self.repository == self.plan.repository,
+            "binding repository does not match embedded ExecutionPlan"
+        );
+
+        let mut fit_ids = BTreeSet::new();
+        let mut compatible_ids = Vec::new();
+        for fit in &self.fits {
+            anyhow::ensure!(
+                !fit.executor_id.trim().is_empty(),
+                "binding fit executor_id is required"
+            );
+            anyhow::ensure!(
+                fit_ids.insert(fit.executor_id.as_str()),
+                "duplicate binding fit executor_id {}",
+                fit.executor_id
+            );
+            anyhow::ensure!(
+                fit.compatible == fit.exclusions.is_empty(),
+                "binding fit {} compatibility does not match exclusions",
+                fit.executor_id
+            );
+            if fit.compatible {
+                compatible_ids.push(fit.executor_id.clone());
+            }
+        }
+
+        compatible_ids.sort();
+        let mut declared = self.compatible_executor_ids.clone();
+        declared.sort();
+        anyhow::ensure!(
+            declared == compatible_ids,
+            "compatible_executor_ids do not match compatible fits"
+        );
+        anyhow::ensure!(
+            declared.windows(2).all(|pair| pair[0] != pair[1]),
+            "compatible_executor_ids contain duplicates"
+        );
+        Ok(())
+    }
 }
 
 pub fn fit(plan: &ExecutionPlan, catalog: &ExecutorCatalog) -> Result<BindingReport> {
@@ -214,15 +284,18 @@ pub fn fit(plan: &ExecutionPlan, catalog: &ExecutorCatalog) -> Result<BindingRep
         .map(|fit| fit.executor_id.clone())
         .collect();
 
-    Ok(BindingReport {
+    let report = BindingReport {
         schema_version: BINDING_REPORT_SCHEMA_VERSION,
         algorithm: BINDING_ALGORITHM_VERSION.into(),
         catalog_id: catalog.catalog_id.clone(),
         job: plan.job.clone(),
         repository: plan.repository.clone(),
+        plan: plan.clone(),
         compatible_executor_ids,
         fits,
-    })
+    };
+    report.validate()?;
+    Ok(report)
 }
 
 fn fit_target(plan: &ExecutionPlan, target: &ExecutorTarget) -> ExecutorFit {

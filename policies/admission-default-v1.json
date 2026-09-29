@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "policy_id": "admission-default-v1",
+  "cpu_capacity_basis": "physical",
+  "memory_capacity_basis": "physical",
+  "reserve_cpu_millis": 1000,
+  "reserve_memory_bytes": 1073741824,
+  "max_cpu_utilization_ratio": 0.9,
+  "max_memory_utilization_ratio": 0.9,
+  "max_io_pressure_ratio": 0.9
+}
