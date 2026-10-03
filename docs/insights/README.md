@@ -20,3 +20,8 @@ An insight snapshot may contain a mixture of:
 - links to relevant market/prior-art references.
 
 Every insight note should clearly mark which statements are **direction**, **current implementation**, or **open question** so future work does not accidentally treat discussion as shipped behavior.
+
+## Insight snapshots
+
+- [Continuous CI profiler and advisor](continuous-ci-profiler-advisor.md)
+- [Local-first, build-model-native, and agent-native CI](local-first-and-build-model-native-ci.md) - NixCI and Preloop prior art, CI market taxonomy, feedback-loop metrics, and benchmark hypotheses.
